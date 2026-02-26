@@ -1,0 +1,85 @@
+<div class="container">
+  <div class="logo">
+    <img src="assets/cometchat-logo.svg" alt="CometChat" />
+  </div>
+
+  <div class="form">
+    <div class="users-section">
+      <div class="users-section-inner">
+        <p class="title">Sign in to CometChat</p>
+      </div>
+
+      <div class="users-grid">
+        <p class="label">Choose a Sample User</p>
+        @for (row of rows; track $index) {
+          <div class="profile-row">
+            @for (user of row; track user.uid) {
+              <div
+                class="profile-card"
+                [class.profile-card-selected]="uidInput === user.uid"
+                (click)="selectUser(user.uid)"
+                role="button"
+                tabindex="0"
+                [attr.aria-pressed]="uidInput === user.uid"
+                (keydown.enter)="selectUser(user.uid)"
+                (keydown.space)="$event.preventDefault(); selectUser(user.uid)"
+              >
+                @if (uidInput === user.uid) {
+                  <div class="check-badge" aria-hidden="true">
+                    <img src="assets/check-icon.svg" alt="" width="10" height="10" />
+                  </div>
+                }
+                <div class="avatar">
+                  <img [src]="user.avatar" [alt]="user.name" />
+                </div>
+                <div class="profile-info">
+                  <p class="profile-name">{{ user.name }}</p>
+                  <p class="profile-uid">{{ user.uid }}</p>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="separator">
+      <div class="separator-line"></div>
+      <p class="separator-text">Or</p>
+      <div class="separator-line"></div>
+    </div>
+
+    <div class="bottom-section">
+      <div class="fields">
+        <div class="field-group">
+          <label class="field-label" for="uid-input">Enter UID</label>
+          <div class="field-input-wrapper">
+            <input
+              id="uid-input"
+              class="field-input"
+              type="text"
+              placeholder="Enter UID here"
+              [(ngModel)]="uidInput"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="button-section">
+        <button class="login-button" type="button" (click)="handleLogin()">
+          <span class="login-button-text">Login</span>
+        </button>
+        <p
+          class="credentials-link"
+          (click)="goToCredentials()"
+          role="button"
+          tabindex="0"
+          (keydown.enter)="goToCredentials()"
+          (keydown.space)="$event.preventDefault(); goToCredentials()"
+        >
+          Change <span>App Credentials</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

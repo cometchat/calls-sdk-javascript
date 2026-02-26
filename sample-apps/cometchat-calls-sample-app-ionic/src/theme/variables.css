@@ -1,0 +1,13 @@
+/* Override Ionic defaults to match the app's dark theme */
+:root {
+  --ion-background-color: #141414;
+  --ion-text-color: #ffffff;
+  --ion-safe-area-top: env(safe-area-inset-top);
+  --ion-safe-area-bottom: env(safe-area-inset-bottom);
+  --ion-safe-area-left: env(safe-area-inset-left);
+  --ion-safe-area-right: env(safe-area-inset-right);
+}
+
+ion-content {
+  --background: #141414;
+}

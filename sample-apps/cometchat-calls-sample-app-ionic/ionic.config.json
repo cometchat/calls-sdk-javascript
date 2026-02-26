@@ -1,0 +1,7 @@
+{
+  "name": "cometchat-calls-sample-app-ionic",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}

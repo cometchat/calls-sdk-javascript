@@ -1,0 +1,12 @@
+<div
+  class="avatar"
+  [style.width.px]="size()"
+  [style.height.px]="size()"
+  [style.fontSize.px]="size() * 0.27"
+>
+  @if (url()) {
+    <img class="image" [src]="url()" [alt]="name()" [width]="size()" [height]="size()" />
+  } @else {
+    {{ initials }}
+  }
+</div>

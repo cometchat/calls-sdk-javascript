@@ -1,0 +1,82 @@
+@if (inMeeting()) {
+  <div class="meeting-container" #meetingContainer></div>
+}
+
+@if (!inMeeting()) {
+  <div class="container">
+    <div class="avatar-wrapper">
+      <button
+        class="avatar-button"
+        type="button"
+        (click)="toggleMenu()"
+        aria-label="Open user menu"
+        [attr.aria-expanded]="menuOpen()"
+        aria-haspopup="true"
+      >
+        <app-avatar [name]="user?.name ?? ''" [url]="user?.avatar" [size]="45" />
+      </button>
+
+      @if (menuOpen()) {
+        <div class="popup-menu" role="menu">
+          <div class="popup-user-info">
+            <app-avatar [name]="user?.name ?? ''" [url]="user?.avatar" [size]="32" />
+            <span class="popup-name">{{ user?.name }}</span>
+          </div>
+          <button class="popup-item" type="button" role="menuitem" (click)="logout()">
+            <img src="assets/logout-icon.svg" alt="" class="popup-icon" />
+            <span class="popup-name">Logout</span>
+          </button>
+          <div class="popup-footer">
+            <span class="popup-version">V.{{ version }}</span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="logo">
+      <img src="assets/cometchat-logo.svg" alt="CometChat" />
+    </div>
+
+    <div class="form">
+      <div class="form-content">
+        <div class="fields">
+          <div class="field-group">
+            <label class="field-label" for="session-id-input">Enter Session Id</label>
+            <div class="input-wrapper">
+              <input
+                id="session-id-input"
+                class="input"
+                type="text"
+                placeholder="Session ID"
+                [ngModel]="sessionId"
+                (ngModelChange)="updateSessionId($event)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          class="join-button"
+          [class.join-button-active]="sessionId"
+          type="button"
+          [disabled]="!sessionId"
+          (click)="joinMeeting()"
+        >
+          <span class="button-text">Join Meeting</span>
+        </button>
+
+        @if (!sessionId) {
+          <div class="separator">
+            <div class="separator-line"></div>
+            <span class="separator-text">Or</span>
+            <div class="separator-line"></div>
+          </div>
+
+          <button class="instant-button" type="button" (click)="startInstantMeeting()">
+            <span class="button-text">Start Instant Meeting</span>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,429 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { CometChatCalls } from "@cometchat/calls-sdk-javascript";
+import { useAppStore } from "../../stores/appStore";
+import { getRandomMeetingId } from "../../utils/helpers";
+import Avatar from "../../components/Avatar.vue";
+import cometchatLogo from "../../assets/cometchat-logo.svg";
+import logoutIcon from "../../assets/logout-icon.svg";
+
+const router = useRouter();
+const route = useRoute();
+const appStore = useAppStore();
+
+const sessionId = computed({
+  get: () => (route.query.sessionId as string) ?? "",
+  set: (value: string) =>
+    router.replace({ query: value ? { sessionId: value } : {} }),
+});
+
+const menuOpen = ref(false);
+const inMeeting = ref(false);
+const menuRef = ref<HTMLDivElement | null>(null);
+const meetingContainerRef = ref<HTMLDivElement | null>(null);
+
+const handleClickOutside = (e: MouseEvent) => {
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
+    menuOpen.value = false;
+  }
+};
+
+const handleLogout = async () => {
+  try {
+    await CometChatCalls.logout();
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+  appStore.clearUser();
+  router.push("/");
+};
+
+const startInstantMeeting = () => {
+  const meetingId = getRandomMeetingId();
+  sessionId.value = meetingId;
+  inMeeting.value = true;
+};
+
+let cleanupEventListener: (() => void) | undefined;
+
+onMounted(() => {
+  document.addEventListener("mousedown", handleClickOutside);
+  cleanupEventListener = CometChatCalls.addEventListener("onConnectionClosed", () => {
+    inMeeting.value = false;
+  });
+});
+
+onUnmounted(() => {
+  document.removeEventListener("mousedown", handleClickOutside);
+  cleanupEventListener?.();
+});
+
+watch([inMeeting, sessionId], async ([meeting, session]) => {
+  if (meeting && session) {
+    const { token } = await CometChatCalls.generateToken(session);
+    if (meetingContainerRef.value) {
+      CometChatCalls.joinSession(token, {}, meetingContainerRef.value);
+    }
+  }
+});
+</script>
+
+<template>
+  <div v-show="inMeeting" class="meeting-container" ref="meetingContainerRef" />
+  <div v-show="!inMeeting" class="container">
+    <div class="avatar-wrapper" ref="menuRef">
+      <button
+        class="avatar-button"
+        type="button"
+        aria-label="Open user menu"
+        :aria-expanded="menuOpen"
+        aria-haspopup="true"
+        @click="menuOpen = !menuOpen"
+      >
+        <Avatar
+          :name="appStore.user?.name ?? ''"
+          :url="appStore.user?.avatar"
+          :size="45"
+        />
+      </button>
+      <div v-if="menuOpen" class="popup-menu" role="menu">
+        <div class="popup-user-info">
+          <Avatar
+            :name="appStore.user?.name ?? ''"
+            :url="appStore.user?.avatar"
+            :size="32"
+          />
+          <span class="popup-name">{{ appStore.user?.name }}</span>
+        </div>
+        <button
+          class="popup-item"
+          type="button"
+          role="menuitem"
+          @click="handleLogout"
+        >
+          <img :src="logoutIcon" alt="" class="popup-icon" />
+          <span class="popup-name">Logout</span>
+        </button>
+        <div class="popup-footer">
+          <span class="popup-version">V.{{ appStore.version }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="logo"><img :src="cometchatLogo" alt="CometChat" /></div>
+    <div class="form">
+      <div class="form-content">
+        <div class="fields">
+          <div class="field-group">
+            <label class="field-label" for="session-id-input"
+              >Enter Session Id</label
+            >
+            <div class="input-wrapper">
+              <input
+                id="session-id-input"
+                v-model="sessionId"
+                class="input"
+                type="text"
+                placeholder="Session ID"
+              />
+            </div>
+          </div>
+        </div>
+        <button
+          :class="['join-button', { 'join-button-active': sessionId }]"
+          type="button"
+          :disabled="!sessionId"
+          @click="inMeeting = true"
+        >
+          <span class="button-text">Join Meeting</span>
+        </button>
+        <template v-if="!sessionId">
+          <div class="separator">
+            <div class="separator-line" />
+            <span class="separator-text">Or</span>
+            <div class="separator-line" />
+          </div>
+          <button
+            class="instant-button"
+            type="button"
+            @click="startInstantMeeting"
+          >
+            <span class="button-text">Start Instant Meeting</span>
+          </button>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.meeting-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #141414;
+  overflow: hidden;
+}
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  position: relative;
+  background: #141414 url("../../assets/dot-grid.png") repeat;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.avatar-wrapper {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+}
+.avatar-button {
+  width: 45px;
+  height: 45px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.popup-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  width: 160px;
+  background: #1a1a1a;
+  border: 1px solid #272727;
+  border-radius: 8px;
+  box-shadow:
+    0px 12px 16px -4px rgba(16, 24, 40, 0.08),
+    0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+  overflow: hidden;
+}
+.popup-user-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  width: 100%;
+  background: #1a1a1a;
+  box-sizing: border-box;
+}
+.popup-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  width: 100%;
+  background: #1a1a1a;
+  border: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+}
+.popup-item:hover {
+  background: #272727;
+}
+.popup-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.popup-name {
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #ffffff;
+  flex: 1;
+}
+.popup-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+  border-top: 1px solid #272727;
+  box-sizing: border-box;
+}
+.popup-version {
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #989898;
+}
+.logo {
+  width: 154px;
+  height: 30px;
+  flex-shrink: 0;
+}
+.logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px 40px;
+  gap: 20px;
+  width: 100%;
+  max-width: 400px;
+  background: #1a1a1a;
+  border: 1px solid #383838;
+  border-radius: 20px;
+  box-shadow:
+    0px 12px 16px -4px rgba(16, 24, 40, 0.08),
+    0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+  box-sizing: border-box;
+}
+.form-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  width: 100%;
+}
+.fields {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  width: 100%;
+}
+.field-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+.field-label {
+  font-family: "Roboto", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.2;
+  color: #ffffff;
+}
+.input-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px;
+  gap: 4px;
+  width: 100%;
+  height: 36px;
+  background: #1a1a1a;
+  border: 1px solid #272727;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.input {
+  flex: 1;
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  color: #f5f5f5;
+  border: none;
+  outline: none;
+  background: transparent;
+  min-width: 90px;
+  padding: 0;
+}
+.input::placeholder {
+  color: #858585;
+}
+.join-button {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 20px;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  background: transparent;
+  border: 1px solid #4c4c4c;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+.join-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.join-button:not(:disabled):hover {
+  border-color: #606060;
+}
+.join-button-active {
+  background: #8c78f0;
+  border-color: #8c78f0;
+}
+.join-button-active:not(:disabled):hover {
+  background: #7a65e0;
+  border-color: #7a65e0;
+}
+.separator {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.separator-line {
+  flex: 1;
+  height: 1px;
+  background: #22262f;
+}
+.separator-text {
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  color: #94979c;
+}
+.instant-button {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 20px;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  background: #8c78f0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.instant-button:hover {
+  background: #7a65e0;
+}
+.button-text {
+  font-family: "Roboto", sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.2;
+  color: #ffffff;
+}
+</style>
