@@ -3,9 +3,9 @@
   <img alt="CometChat" src="https://assets.cometchat.io/website/images/logos/banner.png">
 </p>
 
-# Angular Calls Sample App by CometChat
+# Ionic Calls Sample App by CometChat
 
-This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/sdk/javascript/overview) in an Angular project. It demonstrates how to implement real-time voice and video calling features with ease.
+This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/sdk/javascript/overview) in an Ionic project. It demonstrates how to implement real-time voice and video calling features with ease.
 
 <p align="center">
   <img src="../../screenshots/showcase-1.png" alt="Web Screenshot" width="100%">
@@ -34,13 +34,13 @@ Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app
 
 1. Change into the sample app's directory:
    ```sh
-   cd sample-apps/cometchat-calls-sample-app-angular
+   cd sample-apps/cometchat-calls-sample-app-ionic
    ```
 
 1. Run `npm install` to install the dependencies.
 
 1. `[Optional]` Configure CometChat credentials:
-    - Open the `app-store.service.ts` file located at `src/app/store/app-store.service.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
+    - Open the `useAppStore.ts` file located at `src/store/useAppStore.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
       ```ts
       appId: 'YOUR_APP_ID',
       authKey: 'YOUR_AUTH_KEY',
@@ -50,7 +50,7 @@ Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app
 
 1. Run the app:
    ```sh
-   npm start
+   npm run dev
    ```
 
 

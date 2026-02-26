@@ -1,73 +1,59 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<p align="center">
+  <img alt="CometChat" src="https://assets.cometchat.io/website/images/logos/banner.png">
+</p>
 
-Currently, two official plugins are available:
+# React Calls Sample App by CometChat
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/sdk/javascript/overview) in a React project. It demonstrates how to implement real-time voice and video calling features with ease.
 
-## React Compiler
+<p align="center">
+  <img src="../../screenshots/showcase-1.png" alt="Web Screenshot" width="100%">
+</p>
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+<p align="center">
+  <img src="../../screenshots/showcase-2.png" alt="Mobile Screenshot 1" width="30%">&nbsp;&nbsp;
+  <img src="../../screenshots/showcase-3.png" alt="Mobile Screenshot 2" width="30%">&nbsp;&nbsp;
+  <img src="../../screenshots/showcase-4.png" alt="Mobile Screenshot 3" width="30%">
+</p>
 
-## Expanding the ESLint configuration
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app credentials: _`App ID`_, _`Region`_, and _`Auth Key`_
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Node.js** 18 or higher
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/cometchat/calls-sdk-javascript.git
+   ```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. Change into the sample app's directory:
+   ```sh
+   cd sample-apps/cometchat-calls-sample-app-react
+   ```
+
+1. Run `npm install` to install the dependencies.
+
+1. `[Optional]` Configure CometChat credentials:
+    - Open the `useAppStore.ts` file located at `src/store/useAppStore.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
+      ```ts
+      appId: 'YOUR_APP_ID',
+      authKey: 'YOUR_AUTH_KEY',
+      region: 'YOUR_REGION',
+      ```
+    - Alternatively, you can enter your credentials on first launch via the in-app credentials screen.
+
+1. Run the app:
+   ```sh
+   npm run dev
+   ```
+
+
+## Help and Support
+
+For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/sdk/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us). You can also access real-time support via the [CometChat Dashboard](http://app.cometchat.com/).

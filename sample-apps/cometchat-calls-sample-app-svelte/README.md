@@ -1,47 +1,59 @@
-# Svelte + TS + Vite
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+<p align="center">
+  <img alt="CometChat" src="https://assets.cometchat.io/website/images/logos/banner.png">
+</p>
 
-## Recommended IDE Setup
+# Svelte Calls Sample App by CometChat
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/sdk/javascript/overview) in a Svelte project. It demonstrates how to implement real-time voice and video calling features with ease.
 
-## Need an official Svelte framework?
+<p align="center">
+  <img src="../../screenshots/showcase-1.png" alt="Web Screenshot" width="100%">
+</p>
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+<p align="center">
+  <img src="../../screenshots/showcase-2.png" alt="Mobile Screenshot 1" width="30%">&nbsp;&nbsp;
+  <img src="../../screenshots/showcase-3.png" alt="Mobile Screenshot 2" width="30%">&nbsp;&nbsp;
+  <img src="../../screenshots/showcase-4.png" alt="Mobile Screenshot 3" width="30%">
+</p>
 
-## Technical considerations
 
-**Why use this over SvelteKit?**
+## Prerequisites
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app credentials: _`App ID`_, _`Region`_, and _`Auth Key`_
 
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+- **Node.js** 18 or higher
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
 
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
+## Installation
 
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/cometchat/calls-sdk-javascript.git
+   ```
 
-**Why include `.vscode/extensions.json`?**
+1. Change into the sample app's directory:
+   ```sh
+   cd sample-apps/cometchat-calls-sample-app-svelte
+   ```
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+1. Run `npm install` to install the dependencies.
 
-**Why enable `allowJs` in the TS template?**
+1. `[Optional]` Configure CometChat credentials:
+    - Open the `appStore.svelte.ts` file located at `src/store/appStore.svelte.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
+      ```ts
+      appId: 'YOUR_APP_ID',
+      authKey: 'YOUR_AUTH_KEY',
+      region: 'YOUR_REGION',
+      ```
+    - Alternatively, you can enter your credentials on first launch via the in-app credentials screen.
 
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
+1. Run the app:
+   ```sh
+   npm run dev
+   ```
 
-**Why is HMR not preserving my local component state?**
 
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
+## Help and Support
 
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
-```
+For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/sdk/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us). You can also access real-time support via the [CometChat Dashboard](http://app.cometchat.com/).
