@@ -5,11 +5,8 @@
 
 # Ionic Calls Sample App by CometChat
 
-This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/sdk/javascript/overview) in an Ionic project. It demonstrates how to implement real-time voice and video calling features with ease.
+This is a reference application showcasing the integration of [CometChat's JavaScript Calls SDK](https://www.cometchat.com/docs/calls/javascript/overview) in an Ionic project. It demonstrates how to implement real-time voice and video calling features with ease.
 
-<p align="center">
-  <img src="../../screenshots/showcase-1.png" alt="Web Screenshot" width="100%">
-</p>
 
 <p align="center">
   <img src="../../screenshots/showcase-2.png" alt="Mobile Screenshot 1" width="30%">&nbsp;&nbsp;
@@ -56,4 +53,4 @@ Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app
 
 ## Help and Support
 
-For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/sdk/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us). You can also access real-time support via the [CometChat Dashboard](http://app.cometchat.com/).
+For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/calls/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us). You can also access real-time support via the [CometChat Dashboard](http://app.cometchat.com/).

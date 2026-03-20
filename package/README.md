@@ -33,8 +33,8 @@ The CometChat Calls SDK enables real-time voice and video calling capabilities i
 npm install @cometchat/calls-sdk-javascript
 ```
 
-For the complete setup guide, refer to our [official documentation](https://www.cometchat.com/docs/sdk/javascript/overview).
+For the complete setup guide, refer to our [official documentation](https://www.cometchat.com/docs/calls/javascript/overview).
 
 ## Help and Support
 
-For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/sdk/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us) or seek real-time support via the [CometChat Dashboard](https://app.cometchat.com/).
+For issues running the project or integrating with our UI Kits, consult our [documentation](https://www.cometchat.com/docs/calls/javascript/overview) or create a [support ticket](https://help.cometchat.com/hc/en-us) or seek real-time support via the [CometChat Dashboard](https://app.cometchat.com/).
