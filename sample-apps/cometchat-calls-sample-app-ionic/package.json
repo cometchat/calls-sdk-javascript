@@ -18,7 +18,7 @@
     "@capacitor/haptics": "8.0.0",
     "@capacitor/keyboard": "8.0.0",
     "@capacitor/status-bar": "8.0.0",
-    "@cometchat/calls-sdk-javascript": "^5.0.0-beta.1",
+    "@cometchat/calls-sdk-javascript": "^5.0.0",
     "@ionic/react": "^8.5.0",
     "@ionic/react-router": "^8.5.0",
     "@types/react-router": "^5.1.20",
