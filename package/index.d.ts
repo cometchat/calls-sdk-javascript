@@ -1,13 +1,17 @@
-import { AudioInputDevice } from '../../../calls-sdk-core';
-import { AudioOutputDevice } from '../../../calls-sdk-core';
 import * as v from 'valibot';
-import { VideoInputDevice } from '../../../calls-sdk-core';
 
 declare interface AnyProperties {
     [prop: string]: any;
 }
 
-declare type AudioInputDevice_2 = MediaDeviceInfo & {
+export declare type APIErrorResponse = {
+    message: string;
+    devMessage: string;
+    source: string;
+    code: string;
+};
+
+export declare type AudioInputDevice = MediaDeviceInfo & {
     kind: Extract<MediaDeviceKind, 'audioinput'>;
 };
 
@@ -19,7 +23,7 @@ declare type AudioMode = {
 
 declare type AudioModeType = 'BLUETOOTH' | 'EARPIECE' | 'HEADPHONES' | 'SPEAKER';
 
-declare type AudioOutputDevice_2 = MediaDeviceInfo & {
+export declare type AudioOutputDevice = MediaDeviceInfo & {
     kind: Extract<MediaDeviceKind, 'audiooutput'>;
 };
 
@@ -879,6 +883,14 @@ declare class CallSettingsBuilder {
     setVirtualBackground(virtualBackground: VirtualBackground): this;
     /**
      *
+     * @param {MainVideoContainerSetting} mainVideoContainerSetting
+     * This method can be used to customize the main video container.
+     * @deprecated This method is deprecated and not supported.
+     * @returns
+     */
+    setMainVideoContainerSetting(_mainVideoContainerSetting: MainVideoContainerSetting): this;
+    /**
+     *
      * @param {boolean} showVirtualBackgroundSetting
      * This method shows/hides the virtual background setting button.
      * If set to true it will display the virtual background setting button.
@@ -952,6 +964,10 @@ export declare class CometChatCalls extends SessionMethods {
     };
     static CallLogRequestBuilder: typeof CallLogRequestBuilder;
     static CallLog: typeof CallLog;
+    /** @deprecated */
+    static MainVideoContainerSetting: typeof MainVideoContainerSetting;
+    /** @deprecated */
+    static CallSettings: typeof CallSettings;
     /**
      * @deprecated Use CometChatCalls.init passing object directly.
      */
@@ -975,6 +991,29 @@ export declare class CometChatCalls extends SessionMethods {
         readonly success: true;
         readonly error: null;
     }>;
+    /**
+     * Shared tail of {@link init} / {@link initFromSettings}. Both entry points validate
+     */
+    private static finalizeInit;
+    /**
+     * Initializes the CometChat Calls SDK from a `cometchat-settings.json` object.
+     * Parallels the Chat SDK's `initFromSettings` (file-based init for skills-driven
+     * integrations): it maps the shared settings shape onto the Calls SDK's own
+     * `CallAppSettings` and then performs exactly the same work as {@link init}.
+     * @param settings - Parsed `cometchat-settings.json` object.
+     * @returns An object indicating success or failure with error details.
+     */
+    static initFromSettings(settings: CometChatSettings): Promise<{
+        readonly success: false;
+        readonly error: {
+            readonly name: "VALIDATION_ERROR";
+            readonly message: `Invalid app settings: ${string}`;
+            readonly timestamp: number;
+        };
+    } | {
+        readonly success: true;
+        readonly error: null;
+    }>;
     static login(uid: string, authKey?: string): Promise<User_2>;
     static loginWithAuthToken(authToken: string): Promise<User_2>;
     static logout(): Promise<string>;
@@ -987,6 +1026,13 @@ export declare class CometChatCalls extends SessionMethods {
         token: string;
     }>;
     private static getBaseURL;
+    /**
+     * SDK-identification telemetry chokepoint. Fire-and-forget, deduped, non-fatal.
+     * Called from login success AND init()-session-restore. Sends `/user_sessions`
+     * ONLY when the Chat SDK is absent (it otherwise handles this telemetry itself).
+     * Never awaited on the happy path; never throws.
+     */
+    private static reportSdkIdentification;
     private static loginWithUID;
     private static authenticateWithToken;
     private static logoutInternal;
@@ -1010,13 +1056,13 @@ export declare class CometChatCalls extends SessionMethods {
     static startSession(callToken: string, callSettings: CallSettings, container: HTMLElement): Promise<Result<void, VerifyTokenException>>;
     private static _connectToRoom;
     private static connectToRoom;
-    static joinSession(callToken: string, callSettings: SessionSettings, container: HTMLElement): Promise<Result<void, VerifyTokenException>>;
-    static getAudioInputDevices(): AudioInputDevice_2[];
-    static getVideoInputDevices(): VideoInputDevice_2[];
-    static getAudioOutputDevices(): AudioOutputDevice_2[];
-    static getCurrentAudioInputDevice(): AudioInputDevice_2 | undefined;
-    static getCurrentVideoInputDevice(): VideoInputDevice_2 | undefined;
-    static getCurrentAudioOutputDevice(): AudioOutputDevice_2 | undefined;
+    static joinSession(callToken: string, sessionSettings: SessionSettings, container: HTMLElement): Promise<Result<void, VerifyTokenException>>;
+    static getAudioInputDevices(): AudioInputDevice[];
+    static getVideoInputDevices(): VideoInputDevice[];
+    static getAudioOutputDevices(): AudioOutputDevice[];
+    static getCurrentAudioInputDevice(): AudioInputDevice | undefined;
+    static getCurrentVideoInputDevice(): VideoInputDevice | undefined;
+    static getCurrentAudioOutputDevice(): AudioOutputDevice | undefined;
 }
 
 declare namespace CometChatCallsDefault {
@@ -1041,45 +1087,318 @@ declare interface CometChatException {
     message?: string;
 }
 
+declare interface CometChatSettings {
+    appId: string;
+    region: string;
+    credentials?: {
+        authKey?: string;
+    };
+    callsSDK?: {
+        adminHost?: string | null;
+        clientHost?: string | null;
+        host?: string | null;
+    };
+    chatSDK?: Record<string, unknown>;
+    uiKit?: Record<string, unknown>;
+}
+
+/**
+ * Configuration that applies on both web and mobile platforms.
+ */
 declare type ConfigStateBoth = {
+    /**
+     * Whether the call starts as an audio-only (`'VOICE'`) call or a video
+     * (`'VIDEO'`) call. In a voice call no camera is acquired and no video
+     * tiles are shown.
+     *
+     * @default 'VIDEO'
+     */
     sessionType: SessionType;
+    /**
+     * The arrangement used to display participant video tiles:
+     * - `'TILE'` — an equal grid of all participants.
+     * - `'SIDEBAR'` — one main participant with the rest in a side strip.
+     * - `'SPOTLIGHT'` — a single full-screen participant with the local user
+     *   shown in a small picture-in-picture tile.
+     *
+     * @default 'TILE'
+     */
     layout: Layout;
+    /**
+     * Which camera to use when the call starts: `'FRONT'` (selfie) or `'REAR'`
+     * (back). Primarily relevant on mobile devices with multiple cameras; the
+     * user can still switch afterwards.
+     *
+     * @default undefined — uses the SDK's current camera (front by default)
+     */
     initialCameraFacing?: CameraFacing;
+    /**
+     * Automatically starts recording the session as soon as the call begins,
+     * without the user pressing the record button. Recording must be enabled
+     * for your app for this to take effect.
+     *
+     * @default false
+     */
     autoStartRecording: boolean;
+    /**
+     * Hides the recording button from the call controls, preventing the user
+     * from manually starting or stopping recording from within the SDK UI.
+     *
+     * @default true
+     */
     hideRecordingButton: boolean;
+    /**
+     * Hides the entire bottom control bar (mic, camera, leave, and every other
+     * call control). Useful when the host app provides its own controls.
+     *
+     * @default false
+     */
     hideControlPanel: boolean;
+    /**
+     * Hides the "leave call" button from the call controls. The host app is
+     * then responsible for providing its own way to leave the session.
+     *
+     * @default false
+     */
     hideLeaveSessionButton: boolean;
+    /**
+     * Hides the top header bar of the call UI (which shows the call title,
+     * session timer, and similar information).
+     *
+     * @default false
+     */
     hideHeaderPanel: boolean;
+    /**
+     * Hides the "raise hand" button from the call controls.
+     *
+     * @default false
+     */
     hideRaiseHandButton: boolean;
+    /**
+     * Hides the "share / invite" button that lets the user invite others to
+     * join the call.
+     *
+     * @default true
+     */
     hideShareInviteButton: boolean;
+    /**
+     * Hides the layout-switcher button, preventing the user from changing
+     * between the tile, sidebar, and spotlight layouts at runtime.
+     *
+     * @default false
+     */
     hideChangeLayoutButton: boolean;
+    /**
+     * Hides the microphone mute/unmute button from the call controls.
+     *
+     * @default false
+     */
     hideToggleAudioButton: boolean;
+    /**
+     * Hides the camera on/off button from the call controls.
+     *
+     * @default false
+     */
     hideToggleVideoButton: boolean;
+    /**
+     * Hides the button that opens the participant list panel.
+     *
+     * @default false
+     */
     hideParticipantListButton: boolean;
+    /**
+     * Hides the in-call chat button.
+     *
+     * @default true
+     */
     hideChatButton: boolean;
-    hideScreenSharingButton: boolean;
+    /**
+     * Hides the elapsed-time timer that shows how long the call has been
+     * running.
+     *
+     * @default false
+     */
     hideSessionTimer: boolean;
+    /**
+     * Hides the network-quality indicator that reflects each participant's
+     * connection strength.
+     *
+     * @default true
+     */
     hideNetworkIndicator: boolean;
+    /**
+     * Hides the "recording in progress" badge shown while the session is being
+     * recorded. The recording itself is unaffected.
+     *
+     * @default false
+     */
     hideRecordingStatusIndicator: boolean;
+    /**
+     * Hides the button that switches between the front and rear cameras.
+     * Mainly relevant on mobile devices with more than one camera.
+     *
+     * @default false
+     */
     hideSwitchCameraButton: boolean;
+    /**
+     * Enables the per-participant context menu — opened by right-clicking (web)
+     * or long-pressing (mobile) a participant's tile — that exposes actions such
+     * as pinning a participant.
+     *
+     * Note: this menu is automatically unavailable in the `'SPOTLIGHT'` and
+     * picture-in-picture layouts regardless of this setting.
+     *
+     * @default true
+     */
     enableParticipantContextMenu: boolean;
+    /**
+     * The display name to show for the local user in the call (participant
+     * tiles, participant list, etc.). When left empty, the name associated with
+     * the logged-in user is used.
+     *
+     * @default '' — falls back to the logged-in user's name
+     */
     displayName: string;
+    /**
+     * Joins the call with the microphone muted. The user can unmute manually
+     * afterwards (unless the toggle-audio button is hidden).
+     *
+     * @default false
+     */
     startAudioMuted: boolean;
+    /**
+     * Joins the call with the camera off. The user can turn the camera on
+     * manually afterwards (unless the toggle-video button is hidden).
+     *
+     * @default false
+     */
     startVideoPaused: boolean;
+    /**
+     * Title text shown in the call's header panel (for example, the meeting or
+     * room name).
+     *
+     * @default '' — no title shown
+     */
     title: string;
+    /**
+     * How long, in milliseconds, the local user may remain alone in the call
+     * (no other participants) before an "are you still there?" idle prompt is
+     * shown. The countdown only runs while you are the only participant.
+     *
+     * @default 60000 — 60 seconds
+     */
     idleTimeoutPeriodBeforePrompt: number;
+    /**
+     * How long, in milliseconds, the idle prompt stays on screen waiting for a
+     * response before the SDK automatically leaves the call on the user's behalf.
+     *
+     * @default 180000 — 3 minutes
+     */
     idleTimeoutPeriodAfterPrompt: number;
+    /**
+     * Allows the user to drag the local picture-in-picture tile to reposition
+     * it. Only applies when `layout` is `'SPOTLIGHT'`.
+     *
+     * @default true
+     */
     enableSpotlightDrag: boolean;
-    enableSpotlightSwap: boolean;
+    /**
+     * Marks this as a one-to-one (peer) call. In a peer call, when one
+     * participant leaves the session ends for everyone rather than continuing
+     * without them (unless `forceLeave` is passed when leaving). The remote
+     * peer's connectivity is also watched: if no remote stats arrive for 10
+     * seconds onRemoteConnectionLost is published, and
+     * onRemoteConnectionRestored once they resume.
+     *
+     * @default false
+     */
     isPeerCall: boolean;
+    /**
+     * Enables the in-call toast notifications surfaced by the SDK (for example
+     * "X joined the call" or error messages). Set to `false` to suppress all
+     * SDK toasts.
+     *
+     * @default true
+     */
+    enableNotifications: boolean;
+    /**
+     * @unstable This API may change or be removed in a future release.
+     * When enabled in a voice call (`sessionType: 'VOICE'`), the SDK renders
+     * no visible UI at all — no controls, header, modals, or toast
+     * notifications — while the call connection, media, and events continue
+     * to work normally. Remote participants' audio keeps playing. The host
+     * app is responsible for providing its own UI, including reacting to
+     * session end (the SDK's "session has ended" view and the idle-timeout
+     * prompt/auto-leave are not shown in this mode).
+     *
+     * Only supported in voice calls: for video calls (`sessionType:
+     * 'VIDEO'`) the flag is ignored with a console warning and the default
+     * UI is rendered.
+     *
+     * @default false
+     */
+    unstable_headlessMode: boolean;
 };
 
+/**
+ * Configuration that only applies on the web platform.
+ * These options are ignored on mobile.
+ */
 declare type ConfigStateWeb = {
+    /**
+     * Applies background-noise suppression to the local microphone so that
+     * keyboard clicks, fans, and other ambient sounds are filtered out before
+     * your audio is sent to other participants.
+     *
+     * @default false
+     */
     enableNoiseReduction: boolean;
+    /**
+     * The `deviceId` of the microphone to capture audio from when the call
+     * starts. Use this to pre-select a specific input device instead of the
+     * system default. Device IDs come from the browser's
+     * `navigator.mediaDevices.enumerateDevices()`.
+     *
+     * @default undefined — uses the system default microphone
+     */
     audioInputDeviceId?: string;
+    /**
+     * The `deviceId` of the speaker / output device used to play remote
+     * participants' audio. Use this to pre-select a specific output device
+     * instead of the system default.
+     *
+     * @default undefined — uses the system default speaker
+     */
     audioOutputDeviceId?: string;
+    /**
+     * The `deviceId` of the camera to capture video from when the call starts.
+     * Use this to pre-select a specific camera instead of the system default.
+     *
+     * @default undefined — uses the system default camera
+     */
     videoInputDeviceId?: string;
+    /**
+     * Hides the screen-sharing button from the call controls, preventing the
+     * user from starting a screen share from within the SDK UI.
+     *
+     * @default false
+     */
+    hideScreenSharingButton: boolean;
+    /**
+     * Hides the virtual-background button from the call controls, preventing the
+     * user from blurring or replacing their camera background from within the
+     * SDK UI.
+     *
+     * @default false
+     */
     hideVirtualBackgroundButton: boolean;
+};
+
+declare type ConnectionError = {
+    name: string;
+    message?: string;
+    details?: Record<string, unknown>;
+    recoverable?: boolean;
 };
 
 /**
@@ -1101,7 +1420,10 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onSessionLeft: "onSessionLeft";
         readonly onConnectionLost: "onConnectionLost";
         readonly onConnectionRestored: "onConnectionRestored";
+        readonly onRemoteConnectionLost: "onRemoteConnectionLost";
+        readonly onRemoteConnectionRestored: "onRemoteConnectionRestored";
         readonly onConnectionClosed: "onConnectionClosed";
+        readonly onConnectionFailed: "onConnectionFailed";
         readonly onSessionTimedOut: "onSessionTimedOut";
     };
     readonly MediaEventsListener: {
@@ -1338,8 +1660,54 @@ declare interface LoginListener {
     onLogoutFailure?: (error: CometChatException) => void;
 }
 
+declare class MainVideoContainerSetting {
+    /**
+     *
+     * @param {string} mainVideoAspectRatio
+     * This method is used to set the aspect ratio of main video.
+     * The default value is `contain`
+     * @returns
+     */
+    setMainVideoAspectRatio(_mainVideoAspectRatio: (typeof CallSettings.ASPECT_RATIO)[keyof typeof CallSettings.ASPECT_RATIO]): void;
+    /**
+     *
+     * @param {string} position
+     * @param {boolean} visibility
+     * This method is used to set the position & visibility parameter of the full screen button.
+     * By default the full screen button is visible in the `bottom-right` position.
+     * @returns
+     */
+    setFullScreenButtonParams(_position: (typeof CallSettings.POSITION)[keyof typeof CallSettings.POSITION], _visibility: boolean): void;
+    /**
+     *
+     * @param {string} position
+     * @param {boolean} visibility
+     * @param {string} backgroundColor
+     * This method is used to set the position, visibility & background color of the name label.
+     * By default the name label is visible in the `bottom-left` position with a background-color `rgba(27, 27, 27, 0.4)`
+     * @returns
+     */
+    setNameLabelParams(_position: (typeof CallSettings.POSITION)[keyof typeof CallSettings.POSITION], _visibility: boolean, _backgroundColor: string): void;
+    /**
+     *
+     * @param {string} position
+     * @param {boolean} visibility
+     * This method is used to set the position, visibility of the network label.
+     * By default the network label is visible in the `bottom-right` position.
+     * @returns
+     */
+    setNetworkLabelParams(_position: (typeof CallSettings.POSITION)[keyof typeof CallSettings.POSITION], _visibility: boolean): void;
+}
+
 declare type MobileSDKEvents = SDKEvents & {
     onAudioModeChanged: (payload: AudioMode['type']) => void;
+    /**
+     * Fired when the list of available audio modes changes,
+     * e.g. a Bluetooth device or headphones are connected/disconnected.
+     *
+     * @param payload - The updated list of available audio modes.
+     */
+    onAudioModesChanged: (payload: AudioMode[]) => void;
     onCameraFacingChanged: (payload: CameraFacing) => void;
     onSwitchCameraButtonClicked: () => void;
     onPictureInPictureLayoutEnabled: () => void;
@@ -1697,7 +2065,7 @@ declare class Recording {
 
 declare type Region = _TRegion | Omit<string, _TRegion>;
 
-declare type Result<T, E = Error> = {
+export declare type Result<T, E = Error> = {
     data: T;
     error: null;
 } | {
@@ -1705,8 +2073,9 @@ declare type Result<T, E = Error> = {
     error: E;
 };
 
-declare type SDKEvents = Omit<_SDKEvents, 'onParticipantListChanged'> & {
+declare type SDKEvents = Omit<_SDKEvents, 'onParticipantListChanged' | 'onConnectionFailed'> & {
     onCallLayoutChanged: (payload: Layout) => void;
+    onConnectionFailed: (payload: ConnectionError) => void;
     onParticipantListVisible: () => void;
     onParticipantListHidden: () => void;
     onParticipantListChanged: (payload: Participant_3[]) => void;
@@ -1734,8 +2103,6 @@ declare class SessionMethods extends SessionMethodsCore {
     static hideSettingsDialog(): void;
     static showVirtualBackgroundDialog(): void;
     static hideVirtualBackgroundDialog(): void;
-    static enablePictureInPictureLayout(): void;
-    static disablePictureInPictureLayout(): void;
     static getAudioInputDevices(): AudioInputDevice[];
     static getAudioOutputDevices(): AudioOutputDevice[];
     static getVideoInputDevices(): VideoInputDevice[];
@@ -1785,6 +2152,11 @@ declare class SessionMethodsCore {
      */
     static unmuteAudio(): void;
     /**
+     * Toggles the local user's audio mute state.
+     * If audio is muted, it will be unmuted, and vice versa.
+     */
+    static toggleAudio(): void;
+    /**
      * Pauses the local user's video stream.
      */
     static pauseVideo(): void;
@@ -1793,9 +2165,19 @@ declare class SessionMethodsCore {
      */
     static resumeVideo(): void;
     /**
+     * Toggles the local user's video stream.
+     * If video is paused, it will be resumed, and vice versa.
+     */
+    static toggleVideo(): void;
+    /**
      * Local user leaves the current session.
      */
     static leaveSession(): void;
+    /**
+     * Ends the current session for all participants.
+     * This will terminate the conference and disconnect everyone.
+     */
+    static endSessionForAll(): void;
     /**
      * Raises the user's virtual hand in the call.
      */
@@ -1804,6 +2186,11 @@ declare class SessionMethodsCore {
      * Lowers the user's virtual hand in the call.
      */
     static lowerHand(): void;
+    /**
+     * Toggles the user's virtual hand state.
+     * If the hand is raised, it will be lowered, and vice versa.
+     */
+    static toggleHand(): void;
     /**
      * Switches between the front and rear camera.
      */
@@ -1821,6 +2208,11 @@ declare class SessionMethodsCore {
      * Stops the ongoing call recording.
      */
     static stopRecording(): void;
+    /**
+     * Toggles the call recording state.
+     * If recording is active, it will be stopped, and vice versa.
+     */
+    static toggleRecording(): void;
     /**
      * Pins a participant's video to focus on them.
      * @param participantId - The ID of the participant to pin.
@@ -1846,6 +2238,18 @@ declare class SessionMethodsCore {
      * @param count - The number of unread messages.
      */
     static setChatButtonUnreadCount(count: number): void;
+    /**
+     * Toggles the visibility of the participant list panel.
+     */
+    static toggleParticipantList(): void;
+    /**
+     * Shows the participant list panel.
+     */
+    static showParticipantList(): void;
+    /**
+     * Hides the participant list panel.
+     */
+    static hideParticipantList(): void;
     /**
      * @deprecated switchToVideoCall is deprecated and not supported.
      */
@@ -1915,7 +2319,7 @@ declare interface VerifyTokenException extends Error {
     details?: unknown;
 }
 
-declare type VideoInputDevice_2 = MediaDeviceInfo & {
+export declare type VideoInputDevice = MediaDeviceInfo & {
     kind: Extract<MediaDeviceKind, 'videoinput'>;
 };
 
