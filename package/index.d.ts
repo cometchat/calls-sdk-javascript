@@ -19,6 +19,7 @@ declare type AudioMode = {
     type: AudioModeType;
     selected: boolean;
     uid?: string;
+    name?: string;
 };
 
 declare type AudioModeType = 'BLUETOOTH' | 'EARPIECE' | 'HEADPHONES' | 'SPEAKER';
@@ -234,9 +235,21 @@ export declare class CallLog {
      */
     private initiatedAt;
     /**
+     * The time the call started at. Sent by the calls host in place of
+     * `initiatedAt`; read {@link getStartedAt} and fall back to
+     * {@link getInitiatedAt} when only one of the two is present.
+     */
+    private startedAt;
+    /**
      * The call category of the call log.
      */
     private callCategory;
+    /**
+     * The mode of the call log. Sent by the calls host in place of
+     * `callCategory`; read {@link getMode} and fall back to
+     * {@link getCallCategory} when only one of the two is present.
+     */
+    private mode;
     /**
      * @type {CallUser}
      * The initiator of the call log.
@@ -350,6 +363,26 @@ export declare class CallLog {
      * @param value - The time the call was initiated at.
      */
     setInitiatedAt(value: number): void;
+    /**
+     * Gets the time the call started at.
+     * @returns The time the call started at.
+     */
+    getStartedAt(): number;
+    /**
+     * Sets the time the call started at.
+     * @param value - The time the call started at.
+     */
+    setStartedAt(value: number): void;
+    /**
+     * Gets the mode of the call log.
+     * @returns The mode of the call log.
+     */
+    getMode(): string;
+    /**
+     * Sets the mode of the call log.
+     * @param value - The mode to set.
+     */
+    setMode(value: string): void;
     /**
      * Gets the call category of the call log.
      * @returns The call category of the call log.
@@ -545,6 +578,16 @@ declare class CallLogRequest {
      * @returns A promise that resolves to an array of CallLog objects, or an empty array if there are no previous pages, or rejects with a CometChatCallsException if there was an error..
      */
     fetchPrevious(): Promise<CallLog[] | []>;
+    /**
+     * Gets the page the cursor currently sits on.
+     * @returns The current page, or `0` before the first successful fetch.
+     */
+    getCurrentPage(): number;
+    /**
+     * Gets the number of pages the server reported.
+     * @returns The total page count, or `0` before the first successful fetch.
+     */
+    getTotalPages(): number;
     /**
      * Makes an API call to fetch call logs.
      * @param isFetchNext Whether to fetch the next page of call logs.
@@ -1148,6 +1191,29 @@ declare type ConfigStateBoth = {
      */
     hideRecordingButton: boolean;
     /**
+     * Hides the streaming button from the call controls, preventing the user
+     * from manually starting or stopping a live stream from within the SDK UI.
+     *
+     * @default true
+     */
+    hideStreamingButton: boolean;
+    /**
+     * The RTMP URL to stream to when the user starts a live stream from the
+     * call controls. When set, pressing the start-streaming button skips the
+     * confirmation dialog (which normally asks for a URL and key) and starts
+     * streaming to this URL immediately.
+     *
+     * @default undefined — the user is asked for a URL when starting a stream
+     */
+    streamUrl?: string;
+    /**
+     * The stream key sent along with `streamUrl` when a live stream is
+     * started. Ignored when `streamUrl` is not set.
+     *
+     * @default undefined
+     */
+    streamKey?: string;
+    /**
      * Hides the entire bottom control bar (mic, camera, leave, and every other
      * call control). Useful when the host app provides its own controls.
      *
@@ -1233,6 +1299,13 @@ declare type ConfigStateBoth = {
      * @default false
      */
     hideRecordingStatusIndicator: boolean;
+    /**
+     * Hides the "streaming live" badge shown while the session is being
+     * streamed. The stream itself is unaffected.
+     *
+     * @default false
+     */
+    hideStreamingStatusIndicator: boolean;
     /**
      * Hides the button that switches between the front and rear cameras.
      * Mainly relevant on mobile devices with more than one camera.
@@ -1433,6 +1506,8 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onVideoResumed: "onVideoResumed";
         readonly onRecordingStarted: "onRecordingStarted";
         readonly onRecordingStopped: "onRecordingStopped";
+        readonly onStreamingStarted: "onStreamingStarted";
+        readonly onStreamingStopped: "onStreamingStopped";
         readonly onScreenShareStarted: "onScreenShareStarted";
         readonly onScreenShareStopped: "onScreenShareStopped";
     };
@@ -1449,6 +1524,8 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onParticipantStoppedScreenShare: "onParticipantStoppedScreenShare";
         readonly onParticipantStartedRecording: "onParticipantStartedRecording";
         readonly onParticipantStoppedRecording: "onParticipantStoppedRecording";
+        readonly onParticipantStartedStreaming: "onParticipantStartedStreaming";
+        readonly onParticipantStoppedStreaming: "onParticipantStoppedStreaming";
         readonly onDominantSpeakerChanged: "onDominantSpeakerChanged";
         readonly onParticipantListChanged: "onParticipantListChanged";
     };
@@ -2144,9 +2221,15 @@ declare class SessionMethods extends SessionMethodsCore {
 
 declare class SessionMethodsCore {
     /**
-     * Mutes the local user's audio during the call.
+     * Mutes or unmutes the local user's audio during the call.
+     *
+     * The boolean parameter exists for backward compatibility with the v4 SDK,
+     * where `muteAudio(false)` was the way to unmute. New code should prefer
+     * {@link SessionMethodsCore.unmuteAudio} for clarity.
+     *
+     * @param muteAudio - `true` (default) mutes the local audio track, `false` unmutes it.
      */
-    static muteAudio(): void;
+    static muteAudio(muteAudio?: boolean): void;
     /**
      * Unmutes the local user's audio during the call.
      */
@@ -2157,9 +2240,15 @@ declare class SessionMethodsCore {
      */
     static toggleAudio(): void;
     /**
-     * Pauses the local user's video stream.
+     * Pauses or resumes the local user's video stream.
+     *
+     * The boolean parameter exists for backward compatibility with the v4 SDK,
+     * where `pauseVideo(false)` was the way to resume. New code should prefer
+     * {@link SessionMethodsCore.resumeVideo} for clarity.
+     *
+     * @param pauseVideo - `true` (default) pauses the local video track, `false` resumes it.
      */
-    static pauseVideo(): void;
+    static pauseVideo(pauseVideo?: boolean): void;
     /**
      * Resumes the local user's video stream.
      */
@@ -2200,6 +2289,16 @@ declare class SessionMethodsCore {
      * @param layout - The type of layout to set (tile, sidebar or spotlight).
      */
     static setLayout(layout: Layout): void;
+    /**
+     * Starts streaming the call to the given RTMP destination.
+     * @param streamUrl - The RTMP ingest URL (e.g., "rtmp://a.rtmp.youtube.com/live2").
+     * @param streamKey - The stream key for the destination (e.g., "xxxx-xxxx-xxxx-xxxx-xxxx").
+     */
+    static startStreaming(streamUrl: string, streamKey: string): void;
+    /**
+     * Stops the ongoing call streaming.
+     */
+    static stopStreaming(): void;
     /**
      * Starts recording the call.
      */
