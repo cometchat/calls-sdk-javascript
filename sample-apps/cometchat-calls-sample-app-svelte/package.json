@@ -10,7 +10,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
-    "@cometchat/calls-sdk-javascript": "^5.0.3",
+    "@cometchat/calls-sdk-javascript": "^5.0.5",
     "svelte-spa-router": "^4.0.1"
   },
   "devDependencies": {

@@ -19,6 +19,7 @@ declare type AudioMode = {
     type: AudioModeType;
     selected: boolean;
     uid?: string;
+    name?: string;
 };
 
 declare type AudioModeType = 'BLUETOOTH' | 'EARPIECE' | 'HEADPHONES' | 'SPEAKER';
@@ -234,9 +235,21 @@ export declare class CallLog {
      */
     private initiatedAt;
     /**
+     * The time the call started at. Sent by the calls host in place of
+     * `initiatedAt`; read {@link getStartedAt} and fall back to
+     * {@link getInitiatedAt} when only one of the two is present.
+     */
+    private startedAt;
+    /**
      * The call category of the call log.
      */
     private callCategory;
+    /**
+     * The mode of the call log. Sent by the calls host in place of
+     * `callCategory`; read {@link getMode} and fall back to
+     * {@link getCallCategory} when only one of the two is present.
+     */
+    private mode;
     /**
      * @type {CallUser}
      * The initiator of the call log.
@@ -285,6 +298,12 @@ export declare class CallLog {
      * The recordings of the call log.
      */
     private recordings;
+    /**
+     * @type {Transcription[]}
+     * The transcripts of the call log. Only populated when the request opted in
+     * via `CallLogRequestBuilder.setHasTranscriptions(true)`.
+     */
+    private transcriptions;
     /**
      * Creates a new instance of CallLog.
      * @param data - The data to initialize the call log with.
@@ -350,6 +369,26 @@ export declare class CallLog {
      * @param value - The time the call was initiated at.
      */
     setInitiatedAt(value: number): void;
+    /**
+     * Gets the time the call started at.
+     * @returns The time the call started at.
+     */
+    getStartedAt(): number;
+    /**
+     * Sets the time the call started at.
+     * @param value - The time the call started at.
+     */
+    setStartedAt(value: number): void;
+    /**
+     * Gets the mode of the call log.
+     * @returns The mode of the call log.
+     */
+    getMode(): string;
+    /**
+     * Sets the mode of the call log.
+     * @param value - The mode to set.
+     */
+    setMode(value: string): void;
     /**
      * Gets the call category of the call log.
      * @returns The call category of the call log.
@@ -471,6 +510,19 @@ export declare class CallLog {
      */
     setRecordings(value: Recording[]): void;
     /**
+     * Gets the transcripts of the call log.
+     * @returns The transcripts of the call log, or an empty array when the server
+     * omitted them — never `undefined`. The array is absent unless the request
+     * opted in via `CallLogRequestBuilder.setHasTranscriptions(true)`, and the
+     * server currently omits it even then, so callers must not have to null-check.
+     */
+    getTranscriptions(): Transcription[];
+    /**
+     * Sets the transcripts of the call log.
+     * @param value - The transcripts to set.
+     */
+    setTranscriptions(value: Transcription[]): void;
+    /**
      * Creates a new instance of CallLog from JSON data.
      * @param data - The JSON data to create the call log from.
      * @returns A new instance of CallLog created from the JSON data.
@@ -506,6 +558,11 @@ declare class CallLogRequest {
      * Whether the call has a recording or not.
      */
     private hasRecording;
+    /**
+     * Whether to restrict the list to calls that have transcripts (and have the
+     * server attach each call's `transcriptions` array).
+     */
+    private hasTranscriptions;
     /**
      * The category of call to filter by.
      */
@@ -546,6 +603,16 @@ declare class CallLogRequest {
      */
     fetchPrevious(): Promise<CallLog[] | []>;
     /**
+     * Gets the page the cursor currently sits on.
+     * @returns The current page, or `0` before the first successful fetch.
+     */
+    getCurrentPage(): number;
+    /**
+     * Gets the number of pages the server reported.
+     * @returns The total page count, or `0` before the first successful fetch.
+     */
+    getTotalPages(): number;
+    /**
      * Makes an API call to fetch call logs.
      * @param isFetchNext Whether to fetch the next page of call logs.
      * @returns A promise that resolves to an array of CallLog objects, or rejects with a CometChatCallsException if there was an error.
@@ -573,6 +640,7 @@ declare class CallLogRequestBuilder {
     /** @private */ callType: string;
     /** @private */ callStatus: string;
     /** @private */ hasRecording: boolean;
+    /** @private */ hasTranscriptions: boolean;
     /** @private */ callCategory: string;
     /** @private */ callDirection: string;
     /** @private */ uid: string;
@@ -602,6 +670,14 @@ declare class CallLogRequestBuilder {
      * @returns The CallLogRequestBuilder object.
      */
     setHasRecording(hasRecording: boolean): this;
+    /**
+     * Sets whether only calls that have transcripts should be fetched. Opting in
+     * also makes the server attach each call's `transcriptions` array, readable
+     * via `CallLog.getTranscriptions()`.
+     * @param hasTranscriptions - Whether to restrict the list to transcribed calls.
+     * @returns The CallLogRequestBuilder object.
+     */
+    setHasTranscriptions(hasTranscriptions: boolean): this;
     /**
      * Sets the category of call to be fetched.
      * @param callCategory - The category of call to be fetched. Can be either 'call' or 'meet'.
@@ -935,6 +1011,67 @@ declare const CAMERA_FACING: {
 
 declare type CameraFacing = ValueOf<typeof CAMERA_FACING>;
 
+declare const CAPTION_LANGUAGES: readonly [{
+    readonly code: "en-US";
+    readonly label: "English (United States)";
+}, {
+    readonly code: "de-DE";
+    readonly label: "German (Germany)";
+}, {
+    readonly code: "en-GB";
+    readonly label: "English (United Kingdom)";
+}, {
+    readonly code: "es-ES";
+    readonly label: "Spanish (Spain)";
+}, {
+    readonly code: "fr-FR";
+    readonly label: "French (France)";
+}, {
+    readonly code: "hi-IN";
+    readonly label: "Hindi (India)";
+}, {
+    readonly code: "hu-HU";
+    readonly label: "Hungarian (Hungary)";
+}, {
+    readonly code: "it-IT";
+    readonly label: "Italian (Italy)";
+}, {
+    readonly code: "ja-JP";
+    readonly label: "Japanese (Japan)";
+}, {
+    readonly code: "ko-KR";
+    readonly label: "Korean (South Korea)";
+}, {
+    readonly code: "lt-LT";
+    readonly label: "Lithuanian (Lithuania)";
+}, {
+    readonly code: "ms-MY";
+    readonly label: "Malay (Malaysia)";
+}, {
+    readonly code: "nl-NL";
+    readonly label: "Dutch (Netherlands)";
+}, {
+    readonly code: "pt-PT";
+    readonly label: "Portuguese (Portugal)";
+}, {
+    readonly code: "ru-RU";
+    readonly label: "Russian (Russia)";
+}, {
+    readonly code: "sv-SE";
+    readonly label: "Swedish (Sweden)";
+}, {
+    readonly code: "tr-TR";
+    readonly label: "Turkish (Turkey)";
+}, {
+    readonly code: "zh";
+    readonly label: "Chinese Mandarin (Simplified, China)";
+}, {
+    readonly code: "zh-TW";
+    readonly label: "Chinese Mandarin (Traditional, Taiwan)";
+}];
+
+declare type CaptionLanguageCode = (typeof CAPTION_LANGUAGES)[number]['code'] | (string & {});
+
 declare interface CometChatAPIException extends Error {
     readonly name: 'COMET_CHAT_API_ERROR' | 'NETWORK_ERROR' | 'VALIDATION_ERROR' | 'BAD_RESPONSE' | 'UNKNOWN_ERROR';
     readonly details?: unknown;
@@ -963,6 +1100,7 @@ export declare class CometChatCalls extends SessionMethods {
         };
     };
     static CallLogRequestBuilder: typeof CallLogRequestBuilder;
+    static TranscriptRequestBuilder: typeof TranscriptRequestBuilder;
     static CallLog: typeof CallLog;
     /** @deprecated */
     static MainVideoContainerSetting: typeof MainVideoContainerSetting;
@@ -1141,12 +1279,43 @@ declare type ConfigStateBoth = {
      */
     autoStartRecording: boolean;
     /**
+     * Automatically starts live transcription as soon as the call begins,
+     * without the user pressing the transcription button. Transcription must
+     * be enabled for your app for this to take effect.
+     *
+     * @default false
+     */
+    autoStartTranscription: boolean;
+    /**
      * Hides the recording button from the call controls, preventing the user
      * from manually starting or stopping recording from within the SDK UI.
      *
      * @default true
      */
     hideRecordingButton: boolean;
+    /**
+     * Hides the streaming button from the call controls, preventing the user
+     * from manually starting or stopping a live stream from within the SDK UI.
+     *
+     * @default true
+     */
+    hideStreamingButton: boolean;
+    /**
+     * The RTMP URL to stream to when the user starts a live stream from the
+     * call controls. When set, pressing the start-streaming button skips the
+     * confirmation dialog (which normally asks for a URL and key) and starts
+     * streaming to this URL immediately.
+     *
+     * @default undefined — the user is asked for a URL when starting a stream
+     */
+    streamUrl?: string;
+    /**
+     * The stream key sent along with `streamUrl` when a live stream is
+     * started. Ignored when `streamUrl` is not set.
+     *
+     * @default undefined
+     */
+    streamKey?: string;
     /**
      * Hides the entire bottom control bar (mic, camera, leave, and every other
      * call control). Useful when the host app provides its own controls.
@@ -1234,12 +1403,41 @@ declare type ConfigStateBoth = {
      */
     hideRecordingStatusIndicator: boolean;
     /**
+     * Hides the "streaming live" badge shown while the session is being
+     * streamed. The stream itself is unaffected.
+     *
+     * @default false
+     */
+    hideStreamingStatusIndicator: boolean;
+    /**
      * Hides the button that switches between the front and rear cameras.
      * Mainly relevant on mobile devices with more than one camera.
      *
      * @default false
      */
     hideSwitchCameraButton: boolean;
+    /**
+     * Hides the closed-caption button that lets the user show or hide live
+     * captions on screen. Even when set to `false`, the button only appears
+     * while transcription is running, since captions are produced from the
+     * live transcript.
+     *
+     * @default true
+     */
+    hideClosedCaptionButton: boolean;
+    /**
+     * Hides the transcription button from the call controls, preventing the
+     * user from manually starting or stopping live transcription from within
+     * the SDK UI.
+     *
+     * @default true
+     */
+    hideTranscriptionButton: boolean;
+    /**
+     * The currently selected caption/transcription language code (e.g.
+     * `en-US`). Selected from the closed-caption settings dropdown.
+     */
+    captionLanguage: CaptionLanguageCode;
     /**
      * Enables the per-participant context menu — opened by right-clicking (web)
      * or long-pressing (mobile) a participant's tile — that exposes actions such
@@ -1433,6 +1631,8 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onVideoResumed: "onVideoResumed";
         readonly onRecordingStarted: "onRecordingStarted";
         readonly onRecordingStopped: "onRecordingStopped";
+        readonly onStreamingStarted: "onStreamingStarted";
+        readonly onStreamingStopped: "onStreamingStopped";
         readonly onScreenShareStarted: "onScreenShareStarted";
         readonly onScreenShareStopped: "onScreenShareStopped";
     };
@@ -1449,6 +1649,8 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onParticipantStoppedScreenShare: "onParticipantStoppedScreenShare";
         readonly onParticipantStartedRecording: "onParticipantStartedRecording";
         readonly onParticipantStoppedRecording: "onParticipantStoppedRecording";
+        readonly onParticipantStartedStreaming: "onParticipantStartedStreaming";
+        readonly onParticipantStoppedStreaming: "onParticipantStoppedStreaming";
         readonly onDominantSpeakerChanged: "onDominantSpeakerChanged";
         readonly onParticipantListChanged: "onParticipantListChanged";
     };
@@ -2144,9 +2346,15 @@ declare class SessionMethods extends SessionMethodsCore {
 
 declare class SessionMethodsCore {
     /**
-     * Mutes the local user's audio during the call.
+     * Mutes or unmutes the local user's audio during the call.
+     *
+     * The boolean parameter exists for backward compatibility with the v4 SDK,
+     * where `muteAudio(false)` was the way to unmute. New code should prefer
+     * {@link SessionMethodsCore.unmuteAudio} for clarity.
+     *
+     * @param muteAudio - `true` (default) mutes the local audio track, `false` unmutes it.
      */
-    static muteAudio(): void;
+    static muteAudio(muteAudio?: boolean): void;
     /**
      * Unmutes the local user's audio during the call.
      */
@@ -2157,9 +2365,15 @@ declare class SessionMethodsCore {
      */
     static toggleAudio(): void;
     /**
-     * Pauses the local user's video stream.
+     * Pauses or resumes the local user's video stream.
+     *
+     * The boolean parameter exists for backward compatibility with the v4 SDK,
+     * where `pauseVideo(false)` was the way to resume. New code should prefer
+     * {@link SessionMethodsCore.resumeVideo} for clarity.
+     *
+     * @param pauseVideo - `true` (default) pauses the local video track, `false` resumes it.
      */
-    static pauseVideo(): void;
+    static pauseVideo(pauseVideo?: boolean): void;
     /**
      * Resumes the local user's video stream.
      */
@@ -2201,6 +2415,16 @@ declare class SessionMethodsCore {
      */
     static setLayout(layout: Layout): void;
     /**
+     * Starts streaming the call to the given RTMP destination.
+     * @param streamUrl - The RTMP ingest URL (e.g., "rtmp://a.rtmp.youtube.com/live2").
+     * @param streamKey - The stream key for the destination (e.g., "xxxx-xxxx-xxxx-xxxx-xxxx").
+     */
+    static startStreaming(streamUrl: string, streamKey: string): void;
+    /**
+     * Stops the ongoing call streaming.
+     */
+    static stopStreaming(): void;
+    /**
      * Starts recording the call.
      */
     static startRecording(): void;
@@ -2213,6 +2437,14 @@ declare class SessionMethodsCore {
      * If recording is active, it will be stopped, and vice versa.
      */
     static toggleRecording(): void;
+    /**
+     * Starts transcription of the call.
+     */
+    static startTranscription(): void;
+    /**
+     * Stops the ongoing call transcription.
+     */
+    static stopTranscription(): void;
     /**
      * Pins a participant's video to focus on them.
      * @param participantId - The ID of the participant to pin.
@@ -2282,6 +2514,252 @@ declare type _TDomain = `${string}.call-${_TRegion}.cometchat.io/v3.0/`;
 declare type THEX = `#${string}`;
 
 declare type TPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+/**
+ * A single meeting-transcript artifact returned by the paginated
+ * `GET /calls/:sessionId/transcriptions` endpoint.
+ *
+ * A record is a *pointer* to a downloadable transcript file, not the transcript
+ * text/utterances themselves — fetch {@link Transcript.transcriptUrl} separately
+ * to retrieve the content.
+ *
+ * Every field is optional: the server strips keys whose value is empty, so a
+ * sparse record (e.g. `mid` absent until the pipeline sends `uniqueMeetingId`)
+ * is normal and must parse without error.
+ */
+export declare interface Transcript {
+    /** Transcript id. */
+    tid?: string;
+    /** Meeting id; absent until the pipeline sends `uniqueMeetingId`. */
+    mid?: string;
+    /** Room name. */
+    roomName?: string;
+    /** Meeting start time, epoch SECONDS. */
+    startTime?: number;
+    /** Meeting end time, epoch SECONDS. */
+    endTime?: number;
+    /** Meeting url. */
+    url?: string;
+    /** Transcript date. */
+    transcriptDate?: string;
+    /** Downloadable transcript JSON url. */
+    transcriptUrl?: string;
+    /** Arbitrary metadata bag. */
+    metaData?: Record<string, unknown>;
+}
+
+/**
+ * Represents a transcript artifact attached to a call log.
+ *
+ * Only present when the list request opted in via
+ * `CallLogRequestBuilder.setHasTranscriptions(true)` — the server omits the
+ * `transcriptions` array otherwise.
+ *
+ * A record is a *pointer* to a downloadable transcript file, not the transcript
+ * text itself: fetch {@link Transcription.getTranscriptURL} separately to
+ * retrieve the content.
+ */
+export declare class Transcription {
+    /**
+     * The transcript ID.
+     */
+    private tid;
+    /**
+     * The meeting ID; absent until the pipeline sends `uniqueMeetingId`.
+     */
+    private mid;
+    /**
+     * The room name of the meeting the transcript belongs to.
+     */
+    private roomName;
+    /**
+     * The start time of the transcribed meeting, in epoch seconds.
+     */
+    private startTime;
+    /**
+     * The end time of the transcribed meeting, in epoch seconds.
+     */
+    private endTime;
+    /**
+     * The transcript date.
+     */
+    private transcriptDate;
+    /**
+     * The URL of the downloadable transcript JSON.
+     */
+    private transcriptUrl;
+    /**
+     * Creates a new instance of the Transcription class.
+     * @param data - The data to initialize the transcription object.
+     */
+    constructor(data: any);
+    /**
+     * Gets the transcript ID.
+     * @returns The transcript ID.
+     */
+    getTid(): string;
+    /**
+     * Sets the transcript ID.
+     * @param value - The transcript ID to set.
+     */
+    setTid(value: string): void;
+    /**
+     * Gets the meeting ID.
+     * @returns The meeting ID.
+     */
+    getMid(): string;
+    /**
+     * Sets the meeting ID.
+     * @param value - The meeting ID to set.
+     */
+    setMid(value: string): void;
+    /**
+     * Gets the room name.
+     * @returns The room name.
+     */
+    getRoomName(): string;
+    /**
+     * Sets the room name.
+     * @param value - The room name to set.
+     */
+    setRoomName(value: string): void;
+    /**
+     * Gets the start time of the transcribed meeting.
+     * @returns The start time, in epoch seconds.
+     */
+    getStartTime(): number;
+    /**
+     * Sets the start time of the transcribed meeting.
+     * @param value - The start time, in epoch seconds.
+     */
+    setStartTime(value: number): void;
+    /**
+     * Gets the end time of the transcribed meeting.
+     * @returns The end time, in epoch seconds.
+     */
+    getEndTime(): number;
+    /**
+     * Sets the end time of the transcribed meeting.
+     * @param value - The end time, in epoch seconds.
+     */
+    setEndTime(value: number): void;
+    /**
+     * Gets the transcript date.
+     * @returns The transcript date.
+     */
+    getTranscriptDate(): string;
+    /**
+     * Sets the transcript date.
+     * @param value - The transcript date to set.
+     */
+    setTranscriptDate(value: string): void;
+    /**
+     * Gets the URL of the downloadable transcript JSON.
+     * @returns The transcript URL.
+     */
+    getTranscriptURL(): string;
+    /**
+     * Sets the URL of the downloadable transcript JSON.
+     * @param value - The transcript URL to set.
+     */
+    setTranscriptURL(value: string): void;
+    /**
+     * Creates a new Transcription object from the given JSON data.
+     *
+     * Every key is passed through untouched, so newly-added server fields survive
+     * without an SDK release.
+     * @param data - The JSON data to create the Transcription object from.
+     * @returns A new Transcription object.
+     */
+    static getTranscriptionFromJson(data: any): Transcription;
+}
+
+/**
+ * A single, stateful request for one meeting's transcript artifacts. Holds the
+ * pagination cursor and drives the paginated endpoint via `fetchNext()` /
+ * `fetchPrevious()`. Create one with {@link TranscriptRequestBuilder}.
+ */
+declare class TranscriptRequest {
+    private readonly limit;
+    private readonly sessionId;
+    private readonly config;
+    /** Total pages reported by the server; `null` until a response reports one. */
+    private totalPages;
+    /** Page cursor; `0` before the first fetch. */
+    private currentPage;
+    /** Guards against overlapping in-flight fetches. */
+    private inProgress;
+    constructor(builder: TranscriptRequestBuilder, config: TranscriptRuntimeConfig);
+    /**
+     * Fetches the next page of transcripts.
+     * @returns The page's transcripts, or `[]` when there are no more pages.
+     * @throws {CometChatCallsException} on auth, concurrency, network or response errors.
+     */
+    fetchNext(): Promise<Transcript[]>;
+    /**
+     * Fetches the previous page of transcripts.
+     * @returns The page's transcripts, or `[]` when already at the first page.
+     * @throws {CometChatCallsException} on auth, concurrency, network or response errors.
+     */
+    fetchPrevious(): Promise<Transcript[] | []>;
+    private makeAPICall;
+}
+
+/**
+ * Builder for a {@link TranscriptRequest}.
+ *
+ * @example
+ * const request = new CometChatCalls.TranscriptRequestBuilder()
+ *   .setSessionId('v1.us.2547167fe69871fd.pranav')
+ *   .setLimit(10)
+ *   .build();
+ * const page = await request.fetchNext();
+ */
+declare class TranscriptRequestBuilder {
+    /* Excluded from this release type: limit */
+    /* Excluded from this release type: sessionId */
+    /**
+     * Sets the meeting/session id whose transcripts to fetch. Required.
+     * @param sessionId - The session id (e.g. `v1.us.<appId>.<user>`).
+     */
+    setSessionId(sessionId: string): this;
+    /**
+     * Sets the page size. Optional; defaults to 30 and is clamped to `[1, 1000]`.
+     * @param limit - Transcripts to fetch per page.
+     */
+    setLimit(limit: number): this;
+    /**
+     * Validates pre-flight state and builds the request.
+     * @throws {CometChatCallsException} `NOT_INITIALIZED` if `init()` was not called,
+     *   or `SESSION_ID_REQUIRED` if no session id was set.
+     */
+    build(): TranscriptRequest;
+}
+
+/**
+ * Runtime context the transcript request needs but cannot reach on its own:
+ * `getBaseURL('call')`, `appSettings` and `appId` are all private static on
+ * `CometChatCalls`. The facade stashes this config at `finalizeInit()` (mirroring
+ * how `APIHandler.setAppSettings({ host })` is already wired), and the request
+ * reads it back here.
+ *
+ * The auth token is intentionally a live getter, not a captured value: the token
+ * can change across a re-login, so it is read at fetch time from the public
+ * `CometChatCalls.getUserAuthToken()`.
+ */
+declare interface TranscriptRuntimeConfig {
+    /**
+     * Calls base URL — `getBaseURL('call')`, honours the `appSettings.host`
+     * override. `/calls/:sessionId/transcriptions` is a sub-route of the same
+     * `/calls` resource the call-log list uses, so it lives on the calls host
+     * (`<appId>.call-<region>.cometchat.io`), NOT the chat admin api host.
+     */
+    callsBaseURL: string;
+    /** App id from the init'd settings. */
+    appId: string;
+    /** Live auth-token accessor (from the logged-in user); `null` when logged out. */
+    getAuthToken: () => string | null;
+}
 
 declare type _TRegion = 'eu' | 'us' | 'in';
 
