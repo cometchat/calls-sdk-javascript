@@ -953,7 +953,6 @@ declare class CallSettingsBuilder {
      * @param {VirtualBackground} virtualBackground
      * This method will set the virtual background setting.
      * This methods takes an Object of VirtualBackground Class.
-     * @deprecated Virtual background feature is deprecated and it has no effect.
      * @returns
      */
     setVirtualBackground(virtualBackground: VirtualBackground): this;
@@ -1590,6 +1589,14 @@ declare type ConfigStateWeb = {
      * @default false
      */
     hideVirtualBackgroundButton: boolean;
+    /**
+     * Virtual background engine settings. Lets you opt in to the V2 engine
+     * (`enableV2`) and point the SDK at self-hosted assets (`assetsBaseUrl`).
+     * See {@link VirtualBackgroundConfig}.
+     *
+     * @default undefined — V1 engine, assets from the CometChat CDN
+     */
+    virtualBackground?: VirtualBackgroundConfig;
 };
 
 declare type ConnectionError = {
@@ -1598,6 +1605,19 @@ declare type ConnectionError = {
     details?: Record<string, unknown>;
     recoverable?: boolean;
 };
+
+/**
+ * The built-in CometChat images, shown in the picker when the session
+ * settings don't pass `images`. Kept in its own leaf module (no other
+ * runtime imports) so it can be pulled in — by the store, the v4
+ * compatibility layer, or a test — without the rest of the virtual
+ * background engine.
+ *
+ * Exported publicly and shared by every session, so both the array and its
+ * entries are frozen: a consumer can spread it into their own `images` list
+ * but can't change the defaults for the whole page.
+ */
+export declare const DEFAULT_VIRTUAL_BACKGROUND_IMAGES: ReadonlyArray<Readonly<VirtualBackgroundImage>>;
 
 /**
  *
@@ -2817,6 +2837,8 @@ declare class VirtualBackground {
     getEnforcedBackgroundImage(): string;
 }
 
+/* Excluded from this release type: VirtualBackgroundAdvancedConfig */
+
 declare class VirtualBackgroundBuilder {
     /** @private */ AllowBackgroundBlur: boolean;
     /** @private */ AllowUserImages: boolean;
@@ -2882,6 +2904,52 @@ declare class VirtualBackgroundBuilder {
      */
     build(): VirtualBackground;
 }
+
+/**
+ * Virtual background configuration for the web SDK.
+ */
+export declare type VirtualBackgroundConfig = {
+    /**
+     * Use the V2 engine: inference in a dedicated Web Worker (TF.js on
+     * WebGPU / WebGL, or TFLite WASM), WebGL compositing and Insertable Streams.
+     * When V2 fails to initialise (for example when the worker script cannot be
+     * downloaded), the SDK automatically falls back to the V1 engine for the
+     * rest of the page lifetime.
+     *
+     * @default false
+     */
+    enableV2?: boolean;
+    /**
+     * Base URL (with trailing slash) from which the virtual-background assets
+     * are downloaded: the TFLite WASM binaries, the segmentation models and the
+     * V2 inference worker script. Override this when self-hosting the assets.
+     *
+     * @default the CometChat CDN folder that serves the SDK assets
+     */
+    assetsBaseUrl?: string;
+    /**
+     * Images shown in the virtual background picker. When provided, these
+     * replace the built-in CometChat images. Pass `[]` to show no images. A
+     * plain string is shorthand for `{ src: string }`.
+     * @default the built-in CometChat images
+     */
+    images?: ReadonlyArray<string | VirtualBackgroundImage>;
+    /** Show the "Add Background" upload tile. @default true */
+    allowUserImages?: boolean;
+    /** Show the "Slightly Blur" and "Blur" options. @default true */
+    allowBlur?: boolean;
+    /* Excluded from this release type: advanced */
+};
+
+/**
+ * A single image shown in the virtual background picker.
+ */
+export declare type VirtualBackgroundImage = {
+    /** Image URL. Must be CORS-enabled, or the effect fails to apply. */
+    src: string;
+    /** Tooltip / aria-label for the tile. @default "Background N" */
+    label?: string;
+};
 
 declare interface VirtualParticipant extends Omit<HumanParticipant, 'role' | 'type'> {
     type: 'screen-share';
