@@ -4,7 +4,7 @@ All notable changes to the CometChat Calls SDK for JavaScript are documented her
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Released versions are published to npm as [`@cometchat/calls-sdk-javascript`](https://www.npmjs.com/package/@cometchat/calls-sdk-javascript).
 
-## [5.0.7] - 2026-10-07
+## 5.0.7 — 2026-10-07
 
 ### Added
 
@@ -24,12 +24,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Background image failures now surface during V2 initialization instead of failing silently.
 - The virtual background configuration is cleared on store reset, and uploaded backgrounds are dropped when `allowUserImages` is `false`.
 
-## [5.0.6] - 2026-09-14
+## 5.0.6 — 2026-09-14
 
 ### Fixed
 
 - Audio now plays in Instagram's in-app browser, where Chrome's autoplay policy blocked it. A manual play button is shown when autoplay is blocked.
 - Videos now resume reliably after the app returns to the foreground.
 
-[5.0.7]: https://github.com/cometchat/calls-sdk-javascript/releases/tag/v5.0.7
-[5.0.6]: https://github.com/cometchat/calls-sdk-javascript/releases/tag/v5.0.6
