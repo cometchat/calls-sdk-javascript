@@ -2941,6 +2941,19 @@ export declare type VirtualBackgroundConfig = {
     /* Excluded from this release type: advanced */
 };
 
+/** Payload of the `onVirtualBackgroundFailed` event. */
+export declare type VirtualBackgroundFailure = {
+    reason: VirtualBackgroundFailureReason;
+};
+
+/**
+ * Why the virtual background stopped working:
+ * - `initialization`: the engine could not be loaded or started.
+ * - `inference`: segmentation kept failing while the background was applied.
+ * - `image`: the background image could not be loaded.
+ */
+export declare type VirtualBackgroundFailureReason = 'initialization' | 'inference' | 'image';
+
 /**
  * A single image shown in the virtual background picker.
  */
@@ -2962,6 +2975,12 @@ declare type WebSDKEvents = SDKEvents & {
     onAudioInputDevicesChanged: (device: MediaDeviceInfo[]) => void;
     onVideoInputDevicesChanged: (device: MediaDeviceInfo[]) => void;
     onAudioOutputDevicesChanged: (device: MediaDeviceInfo[]) => void;
+    /**
+     * Fired when the virtual background applied to the local camera fails. The
+     * SDK pauses the local video instead of sending it without the background,
+     * and resets the background to none.
+     */
+    onVirtualBackgroundFailed: (payload: VirtualBackgroundFailure) => void;
 };
 
 export { }

@@ -4,6 +4,23 @@ All notable changes to the CometChat Calls SDK for JavaScript are documented her
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Released versions are published to npm as [`@cometchat/calls-sdk-javascript`](https://www.npmjs.com/package/@cometchat/calls-sdk-javascript).
 
+## 5.0.8 — 2026-10-15
+
+### Added
+
+- **`onVirtualBackgroundFailed` event.** Subscribe with `CometChatCalls.addEventListener('onVirtualBackgroundFailed', listener)` to learn when the virtual background fails for good. The payload is a `VirtualBackgroundFailure` whose `reason` is `'initialization'`, `'inference'` or `'image'`. Applying another background from the listener retries it.
+
+### Changed
+
+- When the virtual background fails for good, the SDK now pauses the local video and resets the background to none, so the camera is never sent without the background the user chose. Previously, frames that could not be segmented were sent unprocessed, and after repeated failures the background was removed for the rest of the call.
+- Peer-to-peer connections are no longer used when `autoStartRecording` is enabled. The recorder always joins as a participant, so a peer-to-peer connection would only be torn down again.
+
+### Fixed
+
+- The camera now turns off when a session is left while a background change is still in progress, for example when `clearVirtualBackground()` is called right before `leaveSession()`.
+- `clearVirtualBackground()`, `setVirtualBackgroundBlurLevel()` and `setVirtualBackgroundImage()` now also update the background picker, which previously kept highlighting the last tile chosen in the UI.
+- Hiding or detaching the call container before the call UI unmounts, for example when a call ends, no longer throws an uncaught "Container dimensions and number of tiles must be positive" error.
+
 ## 5.0.7 — 2026-10-07
 
 ### Added
