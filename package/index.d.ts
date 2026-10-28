@@ -1,5 +1,9 @@
 import * as v from 'valibot';
 
+declare type AllEvents = AllSDKEvents & InternalEvents;
+
+declare type AllSDKEvents = MobileSDKEvents & WebSDKEvents;
+
 declare interface AnyProperties {
     [prop: string]: any;
 }
@@ -715,12 +719,67 @@ declare class CallLogRequestBuilder {
     build(): CallLogRequest;
 }
 
-export declare class CallSession {
-    addEventListener<T extends keyof MobileSDKEvents>(event: T, callback: MobileSDKEvents[T]): {
-        remove: () => void;
-    };
-    getInstance(): CallSession;
+/**
+ * A remote participant of a call session, as reported by
+ * `CometChatCalls.getParticipants()` / `session.getParticipants()` and by the
+ * `onParticipantListChanged` / `onParticipantJoined` / `onParticipantLeft`
+ * listeners.
+ *
+ * Named `CallParticipant` rather than `Participant` because two other public
+ * `Participant` types already exist: the store's
+ * `HumanParticipant | VirtualParticipant` and the v4 `CallLog` participant.
+ */
+export declare type CallParticipant = v.InferOutput<typeof ParticipantSchema>;
+
+export declare type CallReceiverType = 'user' | 'group';
+
+export declare interface CallSession extends InstanceMethodsOf<typeof SessionMethods, (typeof SESSION_CORE_OWN_METHODS)[number]> {
 }
+
+/**
+ * The session object of the SDK (design-docs/SESSION_OBJECT_DESIGN.md,
+ * amended 2026-09-06): the handle {@link CometChatCalls.connect} /
+ * {@link CometChatCalls.initiateCall} hand back and
+ * {@link CometChatCalls.getActiveSession} reports. Like the Android / iOS
+ * `CallSession` it is a **singleton**: it always describes the session the
+ * SDK currently owns — prepared with `connect()` or joined directly with
+ * `joinSession()` — so a handle kept from an earlier session reports the
+ * newer one rather than going stale. It carries the identity of that session
+ * (`sessionId`, `callToken`, the frozen `settings`), the outcome of its
+ * prepare (`prepareStatus`, `error`) and every session method of
+ * `CometChatCalls` (`muteAudio()`, `setLayout()`, `startScreenSharing()`, …)
+ * as an instance method that acts while a session is live and warns
+ * otherwise. {@link join} performs the actual join, {@link leave} cancels the
+ * prepare or leaves the call.
+ *
+ * `connect()` rejects when the prepare failed (the same exception is left on
+ * {@link SessionCore.error}); {@link join} still works afterwards, as a
+ * direct join with the settings frozen at prepare — prepare is an
+ * optimisation, never a blocker.
+ *
+ * Same name and surface as the Android / iOS `CallSession`.
+ */
+export declare class CallSession extends SessionCore<SessionSettings, WebSDKEvents> {
+    private readonly driver;
+    /* Excluded from this release type: __constructor */
+    /**
+     * Joins the session this object describes and mounts the call UI into
+     * `container`.
+     *
+     * - Prepared (or still preparing — the prepare is awaited first): the
+     *   actual join. The user becomes visible, `onSessionJoined` fires, then the
+     *   local tracks are created. Near-instant.
+     * - The prepare failed / expired and nothing is live: a normal direct join
+     *   with the settings frozen at prepare.
+     * - The prepare was cancelled (`leave()` / `leaveSession()`):
+     *   `SESSION_CANCELLED` — `connect()` again to prepare it afresh.
+     * - Already joined (through this object or directly): no-op success.
+     * - Nothing was ever prepared or joined: `VALIDATION_ERROR`.
+     */
+    join(container: HTMLElement): Promise<Result<void, JoinSessionException>>;
+}
+
+/* Excluded from this release type: CallSessionDriver */
 
 declare class CallSettings {
     static POSITION_TOP_LEFT: string;
@@ -988,6 +1047,8 @@ declare class CallSettingsBuilder {
     build(): CallSettings;
 }
 
+export declare type CallType = 'audio' | 'video';
+
 declare class CallUser {
     protected uid: string;
     protected name: string;
@@ -1083,6 +1144,14 @@ export declare class CometChatCalls extends SessionMethods {
     private static loginInProgress;
     private static appSettings;
     private static loginListeners;
+    /** How a `CallSession` performs its joins (see `CallSession.join`). */
+    private static readonly sessionDriver;
+    /**
+     * The one session object of the SDK (see `CallSession`): it always
+     * describes the live session, and is what `connect()` / `initiateCall()`
+     * hand back and `getActiveSession()` reports.
+     */
+    private static readonly session;
     static constants: {
         LAYOUT: {
             readonly TILE: "TILE";
@@ -1162,6 +1231,87 @@ export declare class CometChatCalls extends SessionMethods {
     static generateToken(sessionId: string, authToken?: string): Promise<{
         token: string;
     }>;
+    /**
+     * The request behind {@link generateToken}. With `includeSettings` the
+     * backend also verifies the token inline and returns the verification
+     * response next to it (read it with `parseInlineVerifiedToken`), which
+     * saves {@link connect} / {@link initiateCall} the verification round trip.
+     */
+    private static requestCallToken;
+    /**
+     * Initiates a call: creates it on the server, delivers the "call
+     * initiated" message to the receiver and starts
+     * {@link connect | preparing} the new session so the join is near-instant
+     * when the receiver accepts. The initiate call response already carries
+     * the caller's call token, verified inline, so unlike {@link connect} no
+     * token request is made. Requires a logged-in user
+     * ({@link login} / {@link loginWithAuthToken}) — the requests are
+     * authenticated with their auth token.
+     *
+     * Resolves as soon as the call exists and its prepare is in flight; it
+     * does **not** wait for the prepare to settle, so the outgoing-call UI
+     * gets `data.sessionId` without paying for the connection and the
+     * conference join. `data.session` comes back with
+     * `prepareStatus: 'pending'`: await `data.session.settled` (or read
+     * `prepareStatus` / `error` later) for the outcome. Calling
+     * `data.session.join(container)` while the prepare is still in flight is
+     * fine — it waits for it.
+     *
+     * The returned promise never rejects: failures come back as `error` — `USER_NOT_LOGGED_IN`
+     * when nobody is logged in, `SESSION_ALREADY_ACTIVE` while a session is
+     * joined (no call is created), otherwise the validation / network / API
+     * failure of the request. A prepare failure after the call was created
+     * is **not** an `error` (the receiver is already
+     * ringing): it surfaces on `data.session.prepareStatus` / `.error`
+     * instead, and `data.sessionId` stays available e.g. to
+     * {@link endCall | cancel} the call.
+     *
+     * @param receiver - UID of the user to call — or, with
+     * `receiverType: 'group'`, GUID of the group.
+     * @param options - `type` defaults to `'video'`, `receiverType` to
+     * `'user'`; `sessionSettings` configure the prepared session.
+     * @returns The created call; join it with `data.session.join(container)`
+     * once the receiver accepts.
+     */
+    static initiateCall(receiver: string, options?: InitiateCallOptions): Promise<Result<InitiatedCall, InitiateCallException>>;
+    /**
+     * Ends a call: updates it on the server and delivers the corresponding
+     * "call rejected" / "call cancelled" / "call busy" / "call unanswered"
+     * message to the other party. Requires a logged-in user ({@link login} /
+     * {@link loginWithAuthToken}) — the request is authenticated with their
+     * auth token.
+     *
+     * When the live session ({@link getActiveSession}) is the call being
+     * ended — the caller cancelling the call {@link initiateCall} is still
+     * preparing, or the receiver declining a ringing call they pre-prepared
+     * with {@link connect} — it is torn down first, exactly as
+     * {@link leaveSession} would: a prepare still in flight settles
+     * `cancelled` on the session object, and `onConnectionClosed` fires. The
+     * teardown happens before the request and regardless of its
+     * outcome: the local session goes whether or not the server accepts the
+     * update. A live session for any *other* call — declining an incoming
+     * call `'busy'` mid-call, say — is left untouched, and with no live
+     * session (the usual receiver decline) nothing is torn down.
+     *
+     * A session already in the room tells the other participants how the call
+     * ended instead (a `cc-calls-internal-event` carrying `status`, sent right
+     * before the teardown), and no request is made. Should that send fail,
+     * the request is made as usual.
+     *
+     * Never rejects: failures come back as `error` — `USER_NOT_LOGGED_IN`
+     * when nobody is logged in, otherwise the validation / network / API
+     * failure of the request.
+     *
+     * @param sessionId - Session ID of the call to end (from
+     * {@link initiateCall} or the incoming call message).
+     * @param status - `'rejected'` (default) or `'busy'` when the receiver
+     * declines an incoming call; `'cancelled'` when the caller withdraws
+     * their own outgoing call, or `'unanswered'` when the caller gives up on
+     * it after ringing with no answer.
+     * @returns No data: `{ data: undefined, error: null }` once the call is
+     * ended.
+     */
+    static endCall(sessionId: string, status?: EndCallStatus): Promise<Result<void, EndCallException>>;
     private static getBaseURL;
     /**
      * SDK-identification telemetry chokepoint. Fire-and-forget, deduped, non-fatal.
@@ -1190,10 +1340,141 @@ export declare class CometChatCalls extends SessionMethods {
     /**
      * @deprecated Use CometChatCalls.joinSession instead.
      */
-    static startSession(callToken: string, callSettings: CallSettings, container: HTMLElement): Promise<Result<void, VerifyTokenException>>;
+    static startSession(callToken: string, callSettings: CallSettings, container: HTMLElement): Promise<Result<void, JoinSessionException>>;
     private static _connectToRoom;
-    private static connectToRoom;
-    static joinSession(callToken: string, sessionSettings: SessionSettings, container: HTMLElement): Promise<Result<void, VerifyTokenException>>;
+    /**
+     * Prepares the session `sessionId` ahead of time (e.g. while the user is on
+     * a lobby / device-check screen) so that the actual join is near-instant,
+     * and returns the {@link CallSession} object that owns it. Requires a
+     * logged-in user ({@link login} / {@link loginWithAuthToken}): the call
+     * token of the session is generated internally with their auth token (as
+     * {@link generateToken} does) and kept on the object as
+     * `session.callToken`, next to `session.sessionId`.
+     *
+     * Prepare is **signalling only**: it verifies the token, opens the
+     * connection and joins the conference in a *prepared* state. It does **not**
+     * create audio/video tracks (no permission prompt), does not mount the UI,
+     * and does not count as "joined": `onSessionJoined` does not fire, other
+     * participants do not see the user, the session timer does not run. While
+     * prepared, only terminal events can fire (`onConnectionFailed` for a fatal
+     * error, `onConnectionClosed` when the prepared session is torn down).
+     *
+     * `sessionSettings` are **frozen** at prepare: this is the only
+     * configuration point of a prepared session. To change mic/camera state
+     * from the lobby use `session.muteAudio()` / `unmuteAudio()` /
+     * `pauseVideo()` / `resumeVideo()` — they only flip the intent and take
+     * effect when the tracks are created at the actual join.
+     *
+     * A prepared session that is not joined within 5 minutes is torn down and
+     * `onConnectionClosed` fires.
+     *
+     * Rejects when the session could not be prepared: with a
+     * `{ errorCode, errorDescription }` exception for a missing / blank
+     * `sessionId` (`ERROR_SESSION_ID_MISSING`), no logged-in user
+     * (`ERROR_USER_NOT_LOGGED_IN`) and a failed token generation, and with the
+     * `{ name, message }` `PrepareSessionException` for everything from the
+     * token onwards — a token verification, connection or conference failure,
+     * or `SESSION_ALREADY_ACTIVE` while a session is joined. The same exception
+     * is left on `session.error` (`prepareStatus: 'failed'`), and
+     * `session.join(container)` still works: it performs a normal direct join
+     * with these settings.
+     *
+     * @param sessionId - Session ID of the call to prepare — the ID
+     * {@link initiateCall} returned, or the one carried by the incoming call
+     * message.
+     * @param sessionSettings - Configuration of the prepared session, frozen
+     * at prepare (see above).
+     * @returns Once the prepare has settled, the session object — the SDK's
+     * one `CallSession`, which always describes the live session:
+     * `session.prepareStatus` is `'prepared'` (join with
+     * `session.join(container)`) or `'cancelled'` (`leaveSession()` /
+     * `session.leave()` was called meanwhile, or a later `connect()` for
+     * another session superseded this one — the object then describes that
+     * session).
+     *
+     * Calling this again with the same session ID while it is preparing /
+     * prepared waits for that prepare and generates no second token — the
+     * prepared session is left exactly as it is. A different session ID
+     * silently tears it down and prepares the new one.
+     */
+    static connect(sessionId: string, sessionSettings?: SessionSettings): Promise<CallSession>;
+    /**
+     * What `connect()` resolves with once the prepare has settled: the session
+     * object, or the prepare failure as a rejection.
+     */
+    private static settledSession;
+    /**
+     * The {@link CallSession} of the live session — the very object
+     * {@link connect} / {@link initiateCall} handed out, for apps that would
+     * rather ask the SDK than carry the reference around. Its `sessionId` says
+     * which session it is. It is the SDK's one session object, so it also
+     * describes a session joined directly with {@link joinSession}, exactly as
+     * on Android and iOS.
+     *
+     * `null` when no session is live — none was ever prepared or joined, the
+     * session ended, or its prepare failed / was cancelled — the same condition
+     * as `session.isSessionActive() === false`. A returned object is always
+     * safe to act on.
+     */
+    static getActiveSession(): CallSession | null;
+    /**
+     * The prepare behind {@link connect} and {@link initiateCall}: the phase
+     * guards and the idempotency / supersede bookkeeping of D11, then the
+     * session object pointed at the new prepare *from before the token exists*
+     * (CANCEL_CONNECT_DESIGN D2) — the token generation and verification are
+     * registered with the core as the pending join, so `leaveSession()` /
+     * `endSessionForAll()` cancel them and the remaining steps are skipped.
+     * Every step after an await checks it is still the current prepare, so a
+     * `connect()` superseded meanwhile stops where it is.
+     *
+     * Resolves once the token is minted (or its generation failed / was
+     * cancelled) with the prepare in flight — *before* it has settled —
+     * with the promise of *this* prepare's outcome. `error` is what stops
+     * `connect()`: `SESSION_ALREADY_ACTIVE` (the object is untouched), the
+     * token generation failure as thrown (the prepare is settled
+     * `TOKEN_GENERATION_FAILED`) or a blank minted token (`VALIDATION_ERROR`).
+     * {@link initiateCall} ignores it and hands the object back as is.
+     *
+     * `mintToken` resolves with a token that is already verified:
+     * {@link connect} requests it with `includeSettings: true`,
+     * {@link initiateCall} hands back the initiate call response, which
+     * carries it. Either way the prepare runs on the verification response
+     * that comes with the token; a response without it fails the prepare
+     * (`BAD_RESPONSE`).
+     */
+    private static beginPrepare;
+    /**
+     * Runs the core prepare on the token verified inline by the token request
+     * (a verification failure fails the prepare); always settles the prepare —
+     * `connect()` and `session.join()` await it, so an unexpected throw has to
+     * become a failed outcome rather than a promise that never resolves.
+     */
+    private static runPrepare;
+    /**
+     * Joins a session directly — verify the token, connect, apply
+     * `sessionSettings` — and mounts the call UI into `container`.
+     *
+     * This is the join *without* a prior `connect()`. While a session is
+     * prepared (or preparing) this returns `SESSION_ALREADY_PREPARED`: join it
+     * with `session.join(container)`, or cancel it with `session.leave()`
+     * first. `sessionSettings` are required (`SESSION_SETTINGS_REQUIRED`).
+     * The session object ({@link getActiveSession}) describes the joined
+     * session from here on, as on Android and iOS.
+     */
+    static joinSession(callToken: string, sessionSettings: SessionSettings, container: HTMLElement): Promise<Result<void, JoinSessionException>>;
+    /**
+     * The direct join shared by {@link joinSession} and the dead-prepare
+     * fallback of `CallSession.join()`.
+     */
+    private static directJoin;
+    /**
+     * Leaves the current session, whoever owns it. While a session is merely
+     * prepared this cancels the prepare: `onSessionLeft` does not fire,
+     * `onConnectionClosed` does and the session object's `prepareStatus`
+     * becomes `cancelled`. Same as `session.leave()` on the object returned by
+     * `connect()`.
+     */
+    static leaveSession(): Promise<void>;
     static getAudioInputDevices(): AudioInputDevice[];
     static getVideoInputDevices(): VideoInputDevice[];
     static getAudioOutputDevices(): AudioOutputDevice[];
@@ -1204,7 +1485,9 @@ export declare class CometChatCalls extends SessionMethods {
 
 declare namespace CometChatCallsDefault {
     export {
-        SessionSettings,
+        PrepareSessionException,
+        PrepareSessionStatus,
+        PrepareStatus,
         CometChatCalls
     }
 }
@@ -1620,6 +1903,24 @@ declare type ConnectionError = {
 export declare const DEFAULT_VIRTUAL_BACKGROUND_IMAGES: ReadonlyArray<Readonly<VirtualBackgroundImage>>;
 
 /**
+ * `endCall` error: `USER_NOT_LOGGED_IN` when no user is logged in,
+ * otherwise the validation / network / API failure of the request.
+ */
+export declare type EndCallException = CometChatAPIException | {
+    name: 'USER_NOT_LOGGED_IN';
+    message: string;
+    timestamp: number;
+};
+
+/**
+ * Terminal status set on a call by `CometChatCalls.endCall`:
+ * `'rejected'` / `'busy'` when the receiver declines an incoming call,
+ * `'cancelled'` when the caller withdraws their own outgoing call,
+ * `'unanswered'` when the caller gives up on it after ringing with no answer.
+ */
+export declare type EndCallStatus = 'rejected' | 'cancelled' | 'busy' | 'unanswered';
+
+/**
  *
  *
  * @export
@@ -1634,6 +1935,7 @@ declare interface ErrorModel {
 
 declare const EVENT_LISTENER_METHODS: {
     readonly SessionStatusListener: {
+        readonly onConnected: "onConnected";
         readonly onSessionJoined: "onSessionJoined";
         readonly onSessionLeft: "onSessionLeft";
         readonly onConnectionLost: "onConnectionLost";
@@ -1657,6 +1959,7 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onScreenShareStopped: "onScreenShareStopped";
     };
     readonly ParticipantEventsListner: {
+        readonly onParticipantConnected: "onParticipantConnected";
         readonly onParticipantJoined: "onParticipantJoined";
         readonly onParticipantLeft: "onParticipantLeft";
         readonly onParticipantAudioMuted: "onParticipantAudioMuted";
@@ -1692,6 +1995,8 @@ declare const EVENT_LISTENER_METHODS: {
         readonly onParticipantListHidden: "onParticipantListHidden";
     };
 };
+
+declare type Fn = (...args: never[]) => unknown;
 
 declare type Host = _TDomain | Omit<string, _TDomain>;
 
@@ -1833,6 +2138,108 @@ declare interface ICallsettings {
     };
 }
 
+/**
+ * `initiateCall` error: `USER_NOT_LOGGED_IN` when no user is logged in,
+ * `SESSION_ALREADY_ACTIVE` while a session is joined (the call is not
+ * created), otherwise the validation / network / API failure of the request.
+ */
+export declare type InitiateCallException = CometChatAPIException | {
+    name: 'USER_NOT_LOGGED_IN' | 'SESSION_ALREADY_ACTIVE';
+    message: string;
+    timestamp: number;
+};
+
+export declare interface InitiateCallOptions {
+    /** Kind of call to place. Defaults to `'video'`. */
+    type?: CallType;
+    /** Whether `receiver` is a user UID or a group GUID. Defaults to `'user'`. */
+    receiverType?: CallReceiverType;
+    /**
+     * Settings for the session that is prepared once the call is created.
+     * Frozen at prepare — this is the only configuration point of the
+     * returned `session` (see `CometChatCalls.connect`).
+     */
+    sessionSettings?: SessionSettings;
+}
+
+/**
+ * The call created by `CometChatCalls.initiateCall`, flattened from the
+ * server's "call initiated" message envelope.
+ */
+export declare interface InitiatedCall {
+    /** Session ID of the call — pass it to `generateToken()` to join. */
+    sessionId: string;
+    /** ID of the "call initiated" message delivered to the receiver. */
+    messageId: string;
+    conversationId: string;
+    /** UID of the logged-in user who placed the call. */
+    sender: string;
+    receiver: string;
+    receiverType: CallReceiverType;
+    type: CallType;
+    status: string;
+    initiatedAt: number;
+    /**
+     * The session being prepared for this call so the join is near-instant
+     * when the receiver accepts: join it with `session.join(container)`.
+     * `initiateCall` hands it back while the prepare is still in flight
+     * (`prepareStatus: 'pending'`); await `session.settled` or read
+     * `session.prepareStatus` later for the outcome. A prepare failure
+     * (`'failed'`, error on `session.error`, e.g. `TOKEN_GENERATION_FAILED`)
+     * does **not** fail the `initiateCall` result, because by then the call
+     * already exists on the server and the receiver is ringing. After a failed
+     * prepare `session.join(container)` still works: it performs a normal
+     * direct join. On a token generation failure `session.callToken` is
+     * empty, so fall back to `generateToken(sessionId)` yourself.
+     *
+     * It is the SDK's one session object (see `CallSession`): a later
+     * `connect()` for another session re-points it at that session.
+     */
+    session: CallSession;
+}
+
+/**
+ * The static methods of a class as instance methods (`prototype` and
+ * non-function statics dropped, `Excluded` names left out). Homomorphic on
+ * purpose so the JSDoc of every static carries over to the instance method.
+ */
+declare type InstanceMethodsOf<T, Excluded extends PropertyKey = never> = {
+    [K in keyof T as K extends 'prototype' | Excluded ? never : T[K] extends Fn ? K : never]: T[K];
+};
+
+declare const INTERNAL_EVENTS: {
+    readonly connectionWillClose: "internal.sessionWillClose";
+    readonly onConnectionEstablished: "internal.onConnectionEstablished";
+    readonly onSessionJoined: "internal.onSessionJoined";
+    readonly notification: "internal.notification";
+    readonly queryPermission: "internal.queryPermission";
+    readonly lifecycle: {
+        readonly componentDidMount: "internal.componentDidMount";
+        readonly componentWillUnmount: "internal.componentWillUnmount";
+        readonly SDKInitialized: "internal.SDKInitialized";
+    };
+};
+
+declare type InternalEvents = {
+    [INTERNAL_EVENTS.onConnectionEstablished]: () => void;
+    [INTERNAL_EVENTS.connectionWillClose]: () => void;
+    [INTERNAL_EVENTS.notification]: (payload: {
+        message: string;
+        type: NotificationType;
+        duration?: number;
+        position?: 'top' | 'bottom';
+        action?: {
+            label: string;
+            onPress: () => void;
+        };
+    }) => void;
+    [INTERNAL_EVENTS.lifecycle.componentDidMount]: () => void;
+    [INTERNAL_EVENTS.lifecycle.componentWillUnmount]: () => void;
+    [INTERNAL_EVENTS.onSessionJoined]: () => void;
+    [INTERNAL_EVENTS.lifecycle.SDKInitialized]: () => void;
+    [INTERNAL_EVENTS.queryPermission]: () => void;
+};
+
 declare interface IOngoingCallListener {
     onUserJoined: (user: Partial<ICallEventsData['onUserJoined']>) => void;
     onUserLeft: (user: Partial<ICallEventsData['onUserJoined']>) => void;
@@ -1866,6 +2273,25 @@ declare interface IUserWithExtraData {
     videoTrack: string;
     stats: string;
 }
+
+/**
+ * `joinSession` / `CallSession.join()` error:
+ * - the token could not be verified (`VerifyTokenException`), or
+ *   `session.join()` was called when nothing was ever prepared or joined
+ *   (`VALIDATION_ERROR`);
+ * - `SESSION_SETTINGS_REQUIRED` — `joinSession()` was called without settings;
+ * - `SESSION_ALREADY_PREPARED` — `joinSession()` was called while a session is
+ *   prepared: join it with `session.join(container)` or cancel it with
+ *   `session.leave()` first;
+ * - `SESSION_CANCELLED` — the join was cancelled by `leaveSession()` /
+ *   `endSessionForAll()` before it completed, or `session.join()` was called
+ *   on a session whose prepare was cancelled (`connect()` again to prepare
+ *   it afresh).
+ */
+export declare type JoinSessionException = VerifyTokenException | {
+    name: 'SESSION_SETTINGS_REQUIRED' | 'SESSION_ALREADY_PREPARED' | 'SESSION_CANCELLED';
+    message: string;
+};
 
 declare const LAYOUT: {
     readonly TILE: "TILE";
@@ -1935,6 +2361,8 @@ declare type MobileSDKEvents = SDKEvents & {
     onPictureInPictureLayoutEnabled: () => void;
     onPictureInPictureLayoutDisabled: () => void;
 };
+
+declare type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
 declare class OngoingCallListener {
     /* Excluded from this release type: onYouLeft */
@@ -2189,7 +2617,8 @@ declare class Participant_2 {
     static getParticipantFromJson(object: any): Participant_2;
 }
 
-declare type Participant_3 = v.InferOutput<typeof ParticipantSchema>;
+/** File-local alias of {@link CallParticipant}; the two cannot drift. */
+declare type Participant_3 = CallParticipant;
 
 declare const ParticipantSchema: v.ObjectSchema<{
     readonly pid: v.StringSchema<undefined>;
@@ -2197,6 +2626,68 @@ declare const ParticipantSchema: v.ObjectSchema<{
     readonly uid: v.StringSchema<undefined>;
     readonly avatar: v.OptionalSchema<v.StringSchema<undefined>, undefined>;
 }, undefined>;
+
+declare type PrepareSessionErrorName = 'SESSION_ALREADY_ACTIVE' | 'SESSION_ID_REQUIRED' | 'CONNECTION_FAILED' | 'CONFERENCE_FAILED' | 'PREPARE_TIMEOUT' | 'PREPARE_ABORTED'
+/** An unexpected throw inside the prepare; `details` carries the cause. */
+| 'PREPARE_FAILED' | (string & {});
+
+export declare interface PrepareSessionException {
+    name: PrepareSessionErrorName;
+    message: string;
+    details?: unknown;
+}
+
+/**
+ * Outcome of a core `prepareSession()` call. `cancelled` is not an error:
+ * the app called `leaveSession()` (or started a different prepare) while the
+ * prepare was in flight.
+ */
+declare type PrepareSessionOutcome = {
+    status: PrepareSessionStatus;
+    error: null;
+} | {
+    status: 'failed';
+    error: PrepareSessionException;
+};
+
+export declare type PrepareSessionStatus = 'prepared' | 'cancelled';
+
+/**
+ * Session object (design-docs/SESSION_OBJECT_DESIGN.md, amended 2026-09-06).
+ *
+ * `SessionCore` is the platform-agnostic base of the session object
+ * `CometChatCalls.connect()` / `initiateCall()` / `getActiveSession()` hand
+ * out. Like the Android and iOS `CallSession` it is a **singleton** per
+ * platform: it always describes the session the SDK currently owns — the one
+ * being prepared or prepared, or the one joined, through a prepare or
+ * directly — so a handle kept from an earlier session reports the newer one
+ * rather than going stale. It is a thin handle over the core session phase
+ * machine (`handlers/session.ts`, which needs no knowledge of it): it carries
+ * the identity of the session (session ID, call token, frozen settings) and
+ * the outcome of its prepare, and mirrors every static of
+ * {@link SessionMethodsCore} as an instance method that acts while a session
+ * is live and warns otherwise.
+ *
+ * The platform layers (`calls-sdk-javascript`, React Native) subclass it, add
+ * their own extras, and drive their one instance through the internal
+ * hooks: {@link SessionCore.beginPrepare} when a prepare starts,
+ * {@link SessionCore.settle} once it has settled and
+ * {@link SessionCore.beginDirectJoin} when a direct join takes the session
+ * over. Every prepare gets an id, and a reply that arrives for a prepare
+ * that was superseded meanwhile is ignored, so it can never report over the
+ * session that took its place.
+ */
+/**
+ * Outcome of the prepare this object currently describes. `none` before the
+ * first `connect()` and for a session that was joined directly (nothing was
+ * prepared); `pending` while the prepare is in flight; then `prepared` (the
+ * actual join will be near-instant), `cancelled` (`leave()` /
+ * `leaveSession()` was called meanwhile, or a later `connect()` superseded
+ * it) or `failed` (`error` is set — and `connect()` rejected with it). A dead
+ * prepare never blocks the app: the actual join falls back to a direct join
+ * with the frozen settings.
+ */
+export declare type PrepareStatus = 'none' | 'pending' | PrepareSessionOutcome['status'];
 
 /**
  * Represents a recording object.
@@ -2313,9 +2804,147 @@ declare type _SDKEvents = {
     [k in ValueOf<typeof EVENT_LISTENER_METHODS.ButtonClickListener>]: () => void;
 };
 
+/**
+ * Statics of {@link SessionMethodsCore} that are not mirrored onto
+ * {@link SessionCore}: they get real instance implementations instead, except
+ * `leaveSession` / `endSession`, which the session object replaces with
+ * `leave()`.
+ */
+declare const SESSION_CORE_OWN_METHODS: readonly ["leaveSession", "endSession", "endSessionForAll", "getSessionState", "getCallDetails", "getParticipants"];
+
 declare const SESSION_TYPE: {
     readonly VOICE: "VOICE";
     readonly VIDEO: "VIDEO";
+};
+
+declare interface SessionCore<TSettings extends object = object, TEvents extends SessionEventMap = AllEvents> extends InstanceMethodsOf<typeof SessionMethodsCore, (typeof SESSION_CORE_OWN_METHODS)[number]> {
+}
+
+declare class SessionCore<TSettings extends object = object, TEvents extends SessionEventMap = AllEvents> {
+    private _sessionId;
+    private _callToken;
+    private _settings;
+    /** Which prepare the state below belongs to; a later one supersedes it. */
+    private prepareId;
+    /** `true` from {@link beginPrepare} until the prepare has settled. */
+    private preparing;
+    private outcome;
+    private _settled;
+    private resolveSettled;
+    /* Excluded from this release type: __constructor */
+    /**
+     * The session this object describes — the ID `connect()` was called with.
+     * `null` when nothing named it to the SDK: before the first `connect()`,
+     * or for a session joined directly with a call token only.
+     */
+    get sessionId(): string | null;
+    /**
+     * The call token of the session this object describes: minted by
+     * `connect()` (`''` until it exists — the object describes the session from
+     * before the token does, so a cancel during the token generation lands on
+     * it too) or handed to a direct join. This is what the actual join needs.
+     */
+    get callToken(): string;
+    /** The session settings, frozen at prepare (D6) or applied by the direct join. */
+    get settings(): Readonly<TSettings>;
+    /**
+     * Resolves once the current prepare has settled, with the same outcome as
+     * {@link prepareStatus} / {@link error}; resolves `null` when there is no
+     * prepare (before the first `connect()`, or after a direct join). A prepare
+     * superseded by a later `connect()` settles `cancelled`.
+     */
+    get settled(): Promise<PrepareSessionOutcome | null>;
+    /** Outcome of the current prepare; see {@link PrepareStatus}. */
+    get prepareStatus(): PrepareStatus;
+    /** Why the prepare failed; `null` unless `prepareStatus` is `failed`. */
+    get error(): PrepareSessionException | null;
+    /* Excluded from this release type: beginPrepare */
+    /* Excluded from this release type: beginDirectJoin */
+    /* Excluded from this release type: isPreparing */
+    /* Excluded from this release type: setCallToken */
+    /* Excluded from this release type: settle */
+    /* Excluded from this release type: cancelPendingPrepare */
+    /**
+     * Whether the SDK owns a live session: one being prepared (from the
+     * moment `connect()` is called, before any token exists), prepared, being
+     * joined or joined — through a prepare or directly. `false` once the
+     * session ended, was cancelled or its prepare failed. Same name and
+     * meaning as the Android / iOS `CallSession`, and what backs
+     * `CometChatCalls.getActiveSession()`.
+     */
+    isSessionActive(): boolean;
+    /**
+     * The current state of the session: the core session state, `idle` when
+     * no session is live.
+     */
+    getSessionState(): SessionState;
+    /**
+     * Whether the local user is actually in the call: `true` only once the
+     * session is joined. `false` while it is idle, preparing, prepared (in the
+     * lobby), being joined or left — that is what {@link isSessionActive}
+     * covers. Same name and meaning as the Android / iOS `CallSession`.
+     */
+    isSessionJoined(): boolean;
+    /**
+     * The remote participants of the active call session — the same roster the
+     * `onParticipantListChanged` listener receives. Same as the static
+     * `CometChatCalls.getParticipants()`.
+     *
+     * Returns an empty array when no session is active, and does so silently:
+     * this is a getter, not a command, and the obvious cleanup pattern (handle
+     * `onSessionLeft` → read the roster one last time) must not warn
+     * (design-docs/GET_PARTICIPANTS_DESIGN.md D4). The guard is load-bearing
+     * all the same — the stores are reset just after the session is left, so
+     * there is a window in which the phase is already `left` while the roster
+     * is still populated, and a stale roster must not leak through it.
+     *
+     * The array is a snapshot and does not update as the call changes.
+     */
+    getParticipants(): CallParticipant[];
+    /**
+     * Leaves the live session: cancels the prepare while merely preparing /
+     * prepared (`onConnectionClosed` fires, `onSessionLeft` does not), leaves
+     * the call once joined. A no-op when no session is live. Same as the
+     * static `leaveSession()`.
+     */
+    leave(): Promise<void>;
+    /**
+     * Ends the live session for all participants (see the static
+     * `endSessionForAll()`). Before the conference is joined this cancels the
+     * connect exactly like {@link leave}; once joined the end request is sent
+     * and the teardown arrives with the server's confirmation. A no-op when
+     * no session is live.
+     */
+    endSessionForAll(): Promise<void>;
+    /**
+     * @deprecated This method is deprecated and not supported.
+     */
+    getCallDetails(_sessionID: string, _authToken: string): never;
+    /**
+     * Subscribes to an SDK event. Like a listener registered on the Android /
+     * iOS `CallSession`, it stays registered across sessions until the
+     * returned unsubscribe function is called. Same as the static
+     * `CometChatCalls.addEventListener()`.
+     */
+    addEventListener<K extends keyof TEvents>(eventType: K, listener: NonNullable<TEvents[K]>): () => void;
+    /* Excluded from this release type: reset */
+    /* Excluded from this release type: guardActive */
+    /**
+     * Whether `callToken` / `sessionId` name the session this object
+     * describes: by session ID when both sides know it (every
+     * `generateToken()` mints a different token for the same session), by
+     * token otherwise. Nothing matches an object that describes no session.
+     */
+    private isSameSession;
+}
+
+/**
+ * The events a session object can subscribe to: any subset of the SDK
+ * events (the platform layers narrow it to `WebSDKEvents` /
+ * `MobileSDKEvents`).
+ */
+declare type SessionEventMap = {
+    [K in keyof AllEvents]?: AllEvents[K];
 };
 
 declare class SessionMethods extends SessionMethodsCore {
@@ -2404,14 +3033,52 @@ declare class SessionMethodsCore {
      */
     static toggleVideo(): void;
     /**
-     * Local user leaves the current session.
+     * Local user leaves the current session. While a session is merely
+     * prepared (see `prepareSession`), this cancels the prepare instead:
+     * `onSessionLeft` is not fired, `onConnectionClosed` is. Also cancels a
+     * `connect()` / join that is still generating or verifying its token, or
+     * still connecting — the remaining steps are skipped and
+     * `onConnectionClosed` fires once (design-docs/CANCEL_CONNECT_DESIGN.md).
      */
     static leaveSession(): void;
     /**
+     * Returns the current session state:
+     * - `idle` — no session;
+     * - `preparing` — `prepareSession()` is connecting / joining;
+     * - `prepared` — connected and joined in prepared state (invisible to
+     *   others, no media); `joinSession()` will be near-instant;
+     * - `joining` — a direct `joinSession()` (no prior prepare) is connecting;
+     * - `joined` — the local user is in the session.
+     */
+    static getSessionState(): SessionState;
+    /**
      * Ends the current session for all participants.
-     * This will terminate the conference and disconnect everyone.
+     * This will terminate the conference and disconnect everyone. Also honoured
+     * while the session is merely prepared (see `connect()`): the prepared user
+     * is in the room at the signalling level, so the end request is sent as is.
+     * The server only acts on it when the local user is a moderator. Before
+     * the conference is joined (token generation / verification, connecting,
+     * join in flight) there is nothing to end for anyone else: this cancels the
+     * connect exactly like `leaveSession()` (CANCEL_CONNECT_DESIGN D4).
      */
     static endSessionForAll(): void;
+    /**
+     * Retrieves the current list of remote participants in the call session —
+     * the same roster the `onParticipantListChanged` listener receives (both go
+     * through one helper, so they can never disagree). The local user is not in
+     * it, and neither is anyone whose identity is not known yet: participants
+     * without a `uid` — recorder / transcriber bots, and remotes whose
+     * `user-info` has not landed — are left out
+     * (design-docs/GET_PARTICIPANTS_DESIGN.md D1, D8).
+     *
+     * The array is a snapshot: it is safe to sort / mutate, and it does not
+     * update as the call changes — re-call this, or subscribe to
+     * `onParticipantListChanged`.
+     *
+     * @returns The remote participants of the call session; `[]` when the local
+     * user is alone in it.
+     */
+    static getParticipants(): CallParticipant[];
     /**
      * Raises the user's virtual hand in the call.
      */
@@ -2521,7 +3188,28 @@ declare class SessionMethodsCore {
     static getCallDetails(_sessionID: string, _authToken: string): void;
 }
 
+/**
+ * Lifecycle phase of the local session (see `store/conference.ts`).
+ *
+ * - `idle`      — no session.
+ * - `preparing` — `prepareSession()` is connecting / joining the conference
+ *                 (signalling only, no media).
+ * - `prepared`  — conference joined in prepared state: invisible to others,
+ *                 no tracks, no `onSessionJoined` yet.
+ * - `joining`   — a direct `joinSession()` (no prior prepare) is connecting.
+ * - `joined`    — the local user is joined (flag flipped, `onSessionJoined`
+ *                 fired, media created).
+ * - `left`      — transient state while a session is being torn down.
+ */
+declare type SessionPhase = 'idle' | 'preparing' | 'prepared' | 'joining' | 'joined' | 'left';
+
 export declare type SessionSettings = Partial<ConfigStateWeb & ConfigStateBoth>;
+
+/**
+ * Public session state as reported by `getSessionState()`. The transient
+ * `left` phase is reported as `idle`.
+ */
+declare type SessionState = Exclude<SessionPhase, 'left'>;
 
 declare type SessionType = ValueOf<typeof SESSION_TYPE>;
 
