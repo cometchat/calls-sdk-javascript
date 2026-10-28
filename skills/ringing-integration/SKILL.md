@@ -76,6 +76,8 @@ const offConnected = CometChatCalls.addEventListener('onParticipantConnected', p
 const offJoined = CometChatCalls.addEventListener('onParticipantJoined', () => {
   // The callee answered: show the call screen and join (step 6)
 });
+// If the caller's own prepare failed it is not in the room and never sees onParticipantJoined:
+// the status poll (step 5) reading 'ongoing' means answered, so join then.
 const offClosed = CometChatCalls.addEventListener('onConnectionClosed', async () => {
   // The prepared session went away before anyone joined. It carries no reason: ask the server (step 5)
 });
@@ -115,7 +117,8 @@ async function fetchCallStatus(sessionId: string): Promise<string | null> {
     return null; // keep ringing: a failed request must never end a live call
   }
 }
-// 'rejected' → "Declined", 'busy' → "Busy", 'initiated' / 'ongoing' / null → still ringing, anything else → "Call ended"
+// 'rejected' → "Declined", 'busy' → "Busy", 'initiated' / null → still ringing,
+// 'ongoing' → answered (join, step 6), anything else → "Call ended"
 ```
 
 Start polling as soon as `initiateCall` resolves, not only after "Ringing…": a callee who declines
@@ -155,8 +158,12 @@ CometChat.addCallListener('ringing', new CometChat.CallListener({
 // At logout: CometChat.removeCallListener('ringing')
 ```
 
-- **Answer**: `(await prepared).join(container)` — fall back to `generateToken` + `joinSession` when
-  the prepare failed (step 6).
+- **Answer**: join the SDK's session object. While the call is being prepared or is prepared,
+  `CometChatCalls.getActiveSession()` returns it with `sessionId` set to this call, and
+  `session.join(container)` waits for a prepare still in flight. When it returns `null` (the prepare
+  failed), join directly with `generateToken` + `joinSession` (step 6). Don't call `joinSession`
+  while the prepare runs: it returns `SESSION_ALREADY_PREPARED`. `connect()` itself rejects when the
+  prepare fails, so don't `await` it on the Answer path without a `catch`.
 - **Decline (1:1)**: `CometChatCalls.endCall(sessionId, 'rejected')`, which also leaves the prepared
   session. **Decline (group)**: only `session.leave()` the prepared session: the call goes on for the
   others.
@@ -184,6 +191,15 @@ CometChatCalls.addEventListener('onConnectionClosed', closeCallScreen); // the o
   the room (to the callee) is reliably delivered as an event.
 - **The Chat SDK echoes your own call back as "incoming".** Filter it by the initiator's UID, or the
   caller's tab declines its own call as busy.
+- **Ignore a call you already have.** Before the busy reply, skip an incoming call whose session ID
+  is the one ringing, placed or joined here: `endCall(sessionId, 'busy')` on the live session tears
+  it down.
+- **There is one `CallSession`.** `initiateCall`, `connect` and `getActiveSession` all hand back the
+  same object, re-pointed at the newest session, and `session.leave()` leaves whatever session is
+  live. Check `session.sessionId` before leaving a call you no longer ring for.
+- **The caller's prepared session can outlive a decline.** When the status poll says "Declined" or
+  "Busy", `leave()` the prepared session (if `sessionId` still matches), or it stays in the room
+  until the SDK's 5-minute prepare timeout.
 - **Several tabs ring at once.** Tell the others when one answers or declines (a `BroadcastChannel`).
 - **Browsers block sound until the user interacts with the page.** A ringtone on a tab nobody has
   touched may stay silent; show a browser notification too.

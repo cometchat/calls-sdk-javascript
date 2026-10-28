@@ -72,11 +72,22 @@ CometChatCalls.addEventListener('onConnectionRestored', () => {
 CometChatCalls.addEventListener('onConnectionClosed', () => {
   console.log('Connection closed');
 });
+
+// 5.1+: a session prepared with connect() / initiateCall() is ready to join
+CometChatCalls.addEventListener('onConnected', () => {
+  console.log('Session prepared');
+});
 ```
 
 ### 2. Participant Events
 
 ```typescript
+// 5.1+: a remote participant prepared the session (in the lobby, not yet in the call).
+// In a ringing call this is the callee's device having the call: show "Ringing…"
+CometChatCalls.addEventListener('onParticipantConnected', (participant) => {
+  console.log(`${participant.name} is connected`);
+});
+
 CometChatCalls.addEventListener('onParticipantJoined', (participant) => {
   console.log(`${participant.name} joined`);
 });

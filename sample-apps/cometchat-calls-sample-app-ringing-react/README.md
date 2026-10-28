@@ -15,7 +15,7 @@ Android or iOS rings through the Push Notifications SDK (see the iOS and Android
 - A [CometChat](https://app.cometchat.com/) app: its **App ID**, **Region** (US, EU or IN) and
   **Auth Key**
 - Two browsers, or two browser profiles, to call one user from another (each signs in as a
-  different user)
+  different user). Tabs of one browser profile share the sign-in, so they are the same user.
 
 ## Setup
 
@@ -29,9 +29,12 @@ Android or iOS rings through the Push Notifications SDK (see the iOS and Android
    ```sh
    npm run dev
    ```
-3. Open it in two browsers. On first launch, enter your **App ID**, **Region** and **Auth Key** — or
-   set them in `src/config.ts` before running it.
-4. Sign in as a different user in each browser and call one from the other.
+3. Open the URL it prints (`http://localhost:5173` by default) in two browsers. On first launch,
+   enter your **App ID**, **Region** and **Auth Key** — or set them in `src/config.ts` before
+   running it.
+4. Sign in as a different user in each browser and call one from the other. Allow the camera and
+   microphone when the call starts; allowing notifications (asked when you first place a call) lets a
+   call ring while the tab is in the background.
 
 Browsers only allow the camera and microphone on `https://` pages and `localhost`. To call from
 another device on your network, serve the app over HTTPS.
@@ -57,12 +60,14 @@ another device on your network, serve the app over HTTPS.
    session type and, for a 1:1 call, `isPeerCall: true` (`callSettings` in `calls-context.ts`).
 2. `onParticipantConnected` — a callee's device has the session: "Calling…" becomes "Ringing…".
 3. `onParticipantJoined` — the callee answered: the call screen joins the prepared session with
-   `session.join(container)`.
+   `session.join(container)`. (If the caller's prepare failed it never sees that event; the status
+   check below reads the call as `ongoing` and joins instead.)
 4. The end button, or no answer after 45 seconds, withdraws the call with
    `CometChatCalls.endCall(sessionId, 'cancelled' | 'unanswered')`, which stops the callee ringing.
    The caller gives up before a mobile callee's 60-second ring runs out.
 5. A decline is not reliably pushed to the caller, so a ringing call reads its status from the server
-   every 3 seconds and shows "Declined" or "Busy" (`src/calls/call-state.ts`).
+   every 3 seconds and shows "Declined" or "Busy" (`src/calls/call-state.ts`), then leaves its
+   prepared session.
 
 **Receiving a call**
 
@@ -73,8 +78,9 @@ The web has no VoIP push: a call reaches a tab that is open and signed in.
    the incoming-call screen, and a browser notification when the tab is in the background.
 2. While it rings, `CometChatCalls.connect(sessionId, settings)` prepares the session, so Answer only
    has to join it.
-3. **Answer** joins the prepared session. **Decline** is `endCall(sessionId, 'rejected')`. A tab
-   already in a call declines a 1:1 call with `'busy'`; a group call is just not shown.
+3. **Answer** joins the prepared session (waiting for the prepare if it is still running).
+   **Decline** is `endCall(sessionId, 'rejected')`. A tab already in a call declines a 1:1 call with
+   `'busy'`; a group call is just not shown.
 4. The ring stops when the caller cancels (`onIncomingCallCancelled`, or the prepared session
    closing), and — as a backstop — when the server says the call is over.
 5. With the app open in several tabs, every tab rings; the one that answers or declines tells the

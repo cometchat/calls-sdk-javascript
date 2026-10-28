@@ -58,8 +58,6 @@ const RING_TIMEOUT_MS = 45_000;
 const INCOMING_TIMEOUT_MS = 60_000;
 /** How long "Declined", "No answer" and the like stay up. */
 const END_TEXT_MS = 2_000;
-/** How long Answer waits for a still-running prepare before joining directly. */
-const PREPARE_WAIT_MS = 4_000;
 /** How often a ringing call's status is read from the server. */
 const RING_CHECK_MS = 3_000;
 const LISTENER_ID = 'ringing-sample';
@@ -106,6 +104,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [activeCall, setActiveCall] = useState<JoinRequest | null>(null);
   const phaseRef = useRef<CallPhase>(phase);
   const inCallRef = useRef(false);
+  // The session ID of the call on screen, if any.
+  const activeSessionIdRef = useRef<string | null>(null);
   const outgoingSessionRef = useRef<CallSession | null>(null);
   // The ringing call's prepared session: Answer joins it, and the caller ending the call through
   // the room closes it.
@@ -156,6 +156,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const setInCall = useCallback((call: JoinRequest | null) => {
     inCallRef.current = call !== null;
+    activeSessionIdRef.current = call?.sessionId ?? null;
     tabsRef.current?.setInCall(call !== null);
     setActiveCall(call);
   }, []);
@@ -188,12 +189,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
   );
 
   const endOutgoing = useCallback(
-    (endText: string) => {
+    (endText: string, leave = false) => {
       const cur = phaseRef.current;
       if (cur.kind !== 'outgoing') return;
       clearTimer();
       clearAttention();
       outgoingSessionRef.current = null;
+      if (leave && cur.sessionId) {
+        // Declined or busy: nobody will join, so let go of our prepared session now rather than
+        // leaving it in the room until the SDK's 5-minute prepare timeout. The SDK has one session
+        // object, so check it is still this call.
+        const live = CometChatCalls.getActiveSession();
+        if (live?.sessionId === cur.sessionId && !live.isSessionJoined())
+          void live.leave();
+      }
       setPhase({ ...cur, status: 'ended', endText });
       timerRef.current = setTimeout(() => {
         if (phaseRef.current.kind === 'outgoing') setPhase({ kind: 'idle' });
@@ -239,24 +248,35 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!outgoingSessionId) return;
     let stopped = false;
     const timer = setInterval(async () => {
-      const endText = outgoingRingIsOver(
-        await fetchCallStatus(outgoingSessionId),
-      );
-      if (stopped || !endText) return; // still ringing, or the status could not be read
+      const status = await fetchCallStatus(outgoingSessionId);
+      if (stopped) return;
       const cur = phaseRef.current;
       if (
-        cur.kind === 'outgoing' &&
-        cur.status !== 'ended' &&
-        cur.sessionId === outgoingSessionId
-      ) {
-        endOutgoing(endText);
+        cur.kind !== 'outgoing' ||
+        cur.status === 'ended' ||
+        cur.sessionId !== outgoingSessionId
+      )
+        return;
+      if (status?.toLowerCase() === 'ongoing') {
+        // Answered, but onParticipantJoined never came: our prepare failed, so we are not in the
+        // room to see it. Join now; session.join() falls back to a direct join.
+        join({
+          sessionId: outgoingSessionId,
+          type: cur.type,
+          title: cur.peer.name,
+          isPeerCall: !cur.peer.isGroup,
+          session: outgoingSessionRef.current ?? undefined,
+        });
+        return;
       }
+      const endText = outgoingRingIsOver(status);
+      if (endText) endOutgoing(endText, true); // null: still ringing, or the status could not be read
     }, RING_CHECK_MS);
     return () => {
       stopped = true;
       clearInterval(timer);
     };
-  }, [outgoingSessionId, endOutgoing]);
+  }, [outgoingSessionId, endOutgoing, join]);
 
   // ---- Placing a call ----
 
@@ -403,6 +423,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
           if (caller?.getUid?.() === CometChatCalls.getLoggedInUser()?.uid)
             return;
           const sessionId = call.getSessionId();
+          // The call already ringing, placed or on screen here, delivered again: answering it
+          // 'busy' would end it.
+          const now = phaseRef.current;
+          if (
+            sessionId === activeSessionIdRef.current ||
+            (now.kind !== 'idle' && now.sessionId === sessionId)
+          )
+            return;
           // A message delivered late (a sleeping tab, a reconnect) for a call long over.
           const initiatedAt = call.getInitiatedAt?.() ?? 0;
           if (initiatedAt && Date.now() / 1000 - initiatedAt > 60) return;
@@ -438,12 +466,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
             callSettings(type, groupName ?? peer.name, !isGroup),
           )
             .then((session) => {
-              const cur = phaseRef.current;
-              const stillRinging =
-                cur.kind === 'incoming' && cur.sessionId === sessionId;
               if (incomingPrepareRef.current !== prepare) {
-                // Declined, cancelled or answered elsewhere meanwhile: nobody will join it.
-                if (!stillRinging && session.prepareStatus === 'prepared')
+                // Declined, cancelled or answered elsewhere meanwhile: nobody will join it. Unless
+                // it was answered here (the call screen joins it), or the SDK's one session object
+                // has moved on to another call: leave() would leave that one.
+                if (
+                  activeSessionIdRef.current !== sessionId &&
+                  session.sessionId === sessionId &&
+                  session.prepareStatus === 'prepared'
+                )
                   void session.leave();
                 return null;
               }
@@ -478,29 +509,24 @@ export function CallProvider({ children }: { children: ReactNode }) {
             cur.sessionId !== call.getSessionId()
           )
             return;
-          endOutgoing(outgoingEndText(call.getStatus()) ?? 'Call ended');
+          endOutgoing(outgoingEndText(call.getStatus()) ?? 'Call ended', true);
         },
       }),
     );
     return () => CometChat.removeCallListener(LISTENER_ID);
   }, [setPhase, toIdle, releaseIncoming, endOutgoing]);
 
-  const accept = useCallback(async () => {
+  const accept = useCallback(() => {
     const cur = phaseRef.current;
     if (cur.kind !== 'incoming') return;
     tabsRef.current?.handled(cur.sessionId);
-    // Join the prepared session; if the prepare is still running, give it a moment.
-    const pending = incomingPrepareRef.current;
+    // Join the prepared session. While the prepare is still running, the SDK's session object
+    // already describes this call and its join() waits for the prepare. No session object (the
+    // prepare failed): the call screen joins directly. Don't join directly while the prepare
+    // runs: joinSession() refuses that with SESSION_ALREADY_PREPARED.
+    const live = CometChatCalls.getActiveSession();
     const session =
-      incomingSessionRef.current ??
-      (pending
-        ? await Promise.race([
-            pending,
-            new Promise<null>((r) =>
-              setTimeout(() => r(null), PREPARE_WAIT_MS),
-            ),
-          ])
-        : null);
+      live?.sessionId === cur.sessionId ? live : incomingSessionRef.current;
     // Handed over: the call screen owns it now.
     incomingSessionRef.current = null;
     incomingPrepareRef.current = null;
@@ -530,8 +556,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const callEnded = useCallback(() => setInCall(null), [setInCall]);
 
-  // Signing out mid-ring must not leave a tone going.
-  useEffect(() => () => clearAttention(), []);
+  // Signing out mid-ring must not leave a tone or a timer going.
+  useEffect(
+    () => () => {
+      clearTimer();
+      clearAttention();
+    },
+    [],
+  );
 
   const api = useMemo<CallsApi>(
     () => ({
@@ -540,7 +572,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       activeCall,
       startCall: (peer, type) => void startCall(peer, type),
       cancel,
-      accept: () => void accept(),
+      accept,
       decline,
       callEnded,
     }),
