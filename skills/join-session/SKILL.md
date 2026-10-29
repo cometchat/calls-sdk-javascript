@@ -93,6 +93,7 @@ CometChatCalls.endSessionForAll();
 - `joinSession()` returns `{ data, error }` — check `error` for failures
 - `generateToken()` requires the user to be logged in — it uses the cached auth token
 - Call `joinSession` only after SDK is initialized and user is logged in
+- A ringing call (Calls SDK 5.1+) is prepared by `initiateCall()` / `connect()`: join it with `session.join(container)`, not `joinSession()`, which returns `SESSION_ALREADY_PREPARED` while a session is prepared (see the `ringing-integration` skill)
 - The call UI renders inside the container — the SDK manages the DOM within it
 
 

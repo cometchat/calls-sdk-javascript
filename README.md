@@ -39,6 +39,7 @@ For the complete setup guide, refer to our [official documentation](https://www.
 Dive straight into our sample apps to see the CometChat Calls SDK in action.
 
 - [React Sample App](sample-apps/cometchat-calls-sample-app-react#readme)
+- [Ringing Sample App (React)](sample-apps/cometchat-calls-sample-app-ringing-react#readme): 1:1 and group ringing calls with the Calls SDK 5.1, call history, light and dark
 - [Angular Sample App](sample-apps/cometchat-calls-sample-app-angular#readme)
 - [Vue Sample App](sample-apps/cometchat-calls-sample-app-vue#readme)
 - [Svelte Sample App](sample-apps/cometchat-calls-sample-app-svelte#readme)

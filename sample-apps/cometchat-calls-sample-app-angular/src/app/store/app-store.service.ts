@@ -24,7 +24,7 @@ const initialCredentials: AppCredentials = {
 
 @Injectable({ providedIn: 'root' })
 export class AppStoreService {
-  readonly version = '5.0.0';
+  readonly version = '5.1.0';
 
   private readonly _credentials = signal<AppCredentials>(this.loadCredentials());
   private readonly _user = signal<User | null>(null);

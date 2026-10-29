@@ -27,12 +27,10 @@ npm install @cometchat/calls-sdk-javascript@latest
 ### 2. Initialize the SDK
 
 ```typescript
-const appSettings = {
+const result = await CometChatCalls.init({
   appId: 'YOUR_APP_ID',
   region: 'us', // 'us' | 'eu' | 'in'
-};
-
-const result = await CometChatCalls.init(appSettings);
+});
 if (result.success) {
   console.log('Calls SDK initialized');
 } else {

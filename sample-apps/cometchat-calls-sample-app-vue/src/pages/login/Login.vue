@@ -49,6 +49,15 @@ const uidInput = ref("cometchat-uid-1");
 const router = useRouter();
 const appStore = useAppStore();
 
+// Nothing to sign in to until the app's credentials are set.
+watch(
+  () => appStore.credentials,
+  ({ appId, region, authKey }) => {
+    if (!appId || !region || !authKey) router.replace("/credentials");
+  },
+  { immediate: true },
+);
+
 watch(
   () => appStore.user,
   (user) => {

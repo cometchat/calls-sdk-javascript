@@ -4,6 +4,24 @@ All notable changes to the CometChat Calls SDK for JavaScript are documented her
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Released versions are published to npm as [`@cometchat/calls-sdk-javascript`](https://www.npmjs.com/package/@cometchat/calls-sdk-javascript).
 
+## 5.1.0 — 2026-10-28
+
+### Added
+
+- **Ringing.** `CometChatCalls.initiateCall(...)` starts a call to a user or group and prepares its session, `CometChatCalls.connect(sessionId, ...)` prepares a session while it rings so answering joins almost immediately, and `CometChatCalls.endCall(...)` ends it with an `EndCallStatus` (`rejected`, `cancelled`, `busy` or `unanswered`) that the other side receives. See the [ringing sample](sample-apps/cometchat-calls-sample-app-ringing-react).
+- **`CometChatCalls.getActiveSession()`** returns the live session, with `leave()`, `isSessionJoined()`, `isSessionActive()`, `getParticipants()` and `prepareStatus` on the session object.
+- **`onConnected` and `onParticipantConnected` events**, which fire while a session is prepared and before the user joins.
+
+### Changed
+
+- Screen sharing quality: a shared screen on stage is capped at 1080p, and its lower quality layers are kept so viewers on weaker connections still receive it.
+
+### Fixed
+
+- A participant is no longer shown as muted when their audio track has not been identified yet.
+- The session no longer stays open after the user is removed from the call.
+- One-to-one calls no longer show a reconnecting state and hold the call when the direct peer-to-peer link drops while the media server link is still up.
+
 ## 5.0.8 — 2026-10-15
 
 ### Added

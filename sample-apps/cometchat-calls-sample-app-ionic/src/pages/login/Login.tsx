@@ -44,7 +44,14 @@ const sampleUsers: SampleUser[] = [
 function Login() {
   const [uidInput, setUidInput] = useState('cometchat-uid-1');
   const history = useHistory();
-  const { user, setUser } = useAppStore();
+  const { user, setUser, credentials } = useAppStore();
+
+  useEffect(() => {
+    // Nothing to sign in to until the app's credentials are set.
+    if (!credentials.appId || !credentials.region || !credentials.authKey) {
+      history.replace('/credentials');
+    }
+  }, [credentials, history]);
 
   useEffect(() => {
     if (user) {

@@ -20,7 +20,7 @@ cp -r skills/ /path/to/your/project/skills/
 |-------|-------------|
 | `setup` | SDK install, npm, CallAppSettings, init, login, permissions |
 | `join-session` | CometChatCalls.joinSession, SessionSettings, voice vs video |
-| `ringing-integration` | Dual SDK (Chat + Calls), initiateCall, accept/reject/cancel, incoming/outgoing |
+| `ringing-integration` | Calls SDK 5.1 ringing: initiateCall, connect, endCall, decline/busy, group calls, incoming calls via the Chat SDK |
 | `session-settings` | All SessionSettings options: layouts, session type, hide buttons, idle timeout |
 | `event-listeners` | addEventListener for session, participant, media, button, layout events, participant actions |
 | `call-logs` | CallLogRequestBuilder, fetching and displaying call history |
@@ -48,7 +48,8 @@ Each skill has a `description` field in its YAML frontmatter that lists trigger 
 ## Compatibility
 
 - CometChat Calls SDK v5 (`@cometchat/calls-sdk-javascript@latest`)
-- CometChat Chat SDK v4 (`@cometchat/chat-sdk-javascript@latest`) — required for ringing
+- CometChat Calls SDK 5.1+ for ringing
+- CometChat Chat SDK v4 (`@cometchat/chat-sdk-javascript@latest`) — required for ringing: it delivers incoming calls to the tab
 - TypeScript 5.x, any modern bundler (Vite, Webpack, etc.)
 - Framework-agnostic — works with React, Vue, Angular, Svelte, vanilla JS
 - Works with: Kiro, Claude Code, Cursor, Copilot, and other AI coding assistants that support the skills ecosystem

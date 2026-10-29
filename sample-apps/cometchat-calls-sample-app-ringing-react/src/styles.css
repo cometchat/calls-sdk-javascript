@@ -1,0 +1,491 @@
+/*
+ * Colour, type and spacing tokens for the whole app, in light and dark. Components use these
+ * variables and never a literal colour, so the app follows the appearance setting.
+ *
+ * Appearance (Profile → Appearance): "system" leaves <html> unstamped and follows the OS;
+ * "light" / "dark" stamp data-theme on <html> and win over the OS. The values match the iOS and
+ * Android ringing samples.
+ */
+:root {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --background-2: #f5f5f5;
+  --background-3: #ececec;
+  --border: #ececec;
+  --border-strong: #c3cbd6;
+  --code-background: #f5f5f5;
+
+  --accent: #6d5df6;
+  --accent-soft: rgb(109 93 246 / 0.08);
+  --accent-soft-hover: rgb(109 93 246 / 0.16);
+  --on-accent: #ffffff;
+
+  --text-primary: #181a20;
+  --text-secondary: #7e7e7e;
+  --text-tertiary: #9e9e9e;
+  --text-disabled: #c3cbd6;
+
+  --status-online: #2eb57d;
+  --status-success-bg: rgb(46 181 125 / 0.1);
+  --status-error: #d9235e;
+  --status-error-bg: rgb(217 35 94 / 0.1);
+  --status-neutral-bg: #f5f5f5;
+
+  --scrim: rgb(0 0 0 / 0.5);
+  --shadow: 0 12px 32px rgb(24 26 32 / 0.16);
+
+  /* The ringing screens stay dark in both themes. */
+  --call-background: #1a1d21;
+  --call-text-primary: #ffffff;
+  --call-text-secondary: rgb(255 255 255 / 0.7);
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: #1a1d21;
+    --surface: #222529;
+    --background-2: #26282c;
+    --background-3: #2c2d30;
+    --border: #35373b;
+    --border-strong: #4c4c4c;
+    --code-background: #2c2d30;
+    --accent-soft: rgb(109 93 246 / 0.16);
+    --accent-soft-hover: rgb(109 93 246 / 0.26);
+    --text-primary: #d1d2d3;
+    --text-secondary: #9a9b9d;
+    --text-tertiary: #6e6f71;
+    --text-disabled: #4c4c4c;
+    --status-online: #2bac76;
+    --status-success-bg: rgb(43 172 118 / 0.1);
+    --status-error: #e01e5a;
+    --status-error-bg: rgb(224 30 90 / 0.1);
+    --status-neutral-bg: #26282c;
+    --shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --background: #1a1d21;
+  --surface: #222529;
+  --background-2: #26282c;
+  --background-3: #2c2d30;
+  --border: #35373b;
+  --border-strong: #4c4c4c;
+  --code-background: #2c2d30;
+  --accent-soft: rgb(109 93 246 / 0.16);
+  --accent-soft-hover: rgb(109 93 246 / 0.26);
+  --text-primary: #d1d2d3;
+  --text-secondary: #9a9b9d;
+  --text-tertiary: #6e6f71;
+  --text-disabled: #4c4c4c;
+  --status-online: #2bac76;
+  --status-success-bg: rgb(43 172 118 / 0.1);
+  --status-error: #e01e5a;
+  --status-error-bg: rgb(224 30 90 / 0.1);
+  --status-neutral-bg: #26282c;
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* ---- Type ---- */
+
+.large-title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.body-strong {
+  font-weight: 600;
+}
+
+.caption {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.section-label {
+  display: block;
+  margin: 0 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Surfaces ---- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.code-block {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--code-background);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* ---- Buttons ---- */
+
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.button-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.button-primary:disabled {
+  background: var(--background-2);
+  color: var(--text-disabled);
+}
+
+.button-primary.full {
+  width: 100%;
+}
+
+.button-outline-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--status-error);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--status-error);
+  font-weight: 600;
+}
+
+.button-outline-danger:hover:not(:disabled) {
+  background: var(--status-error-bg);
+}
+
+.button-text {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 4px;
+}
+
+/* A round 40px call button on a soft accent fill. */
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--accent-soft-hover);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+}
+
+.icon-button.plain {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.icon-button.plain:hover:not(:disabled) {
+  background: var(--background-2);
+}
+
+/* ---- Fields ---- */
+
+.field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: var(--background-2);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.field::placeholder {
+  color: var(--text-tertiary);
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-field > svg {
+  position: absolute;
+  left: 14px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.search-field .field {
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+.search-field .icon-button {
+  position: absolute;
+  right: 2px;
+}
+
+/* ---- Lists ---- */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 16px;
+}
+
+button.row {
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+button.row:hover {
+  background: var(--background-2);
+}
+
+.row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-text > * {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty strong {
+  color: var(--text-primary);
+}
+
+.empty .button-primary {
+  margin-top: 12px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---- Sheets (Dialog) ---- */
+
+.sheet {
+  width: min(100% - 32px, 560px);
+  max-width: none;
+  max-height: min(100% - 48px, 760px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--background);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+
+.sheet::backdrop {
+  background: var(--scrim);
+}
+
+/* The header stays put; only the content scrolls. */
+.sheet[open] {
+  display: flex;
+  overflow: hidden;
+}
+
+.sheet__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sheet__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+@media (max-width: 600px) {
+  .sheet {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+/* The search field has its own clear button. */
+.search-field input::-webkit-search-cancel-button {
+  appearance: none;
+}
