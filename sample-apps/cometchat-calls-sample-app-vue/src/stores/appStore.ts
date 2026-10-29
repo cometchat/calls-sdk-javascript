@@ -22,7 +22,7 @@ const initialCredentials: AppCredentials = {
 
 export const useAppStore = defineStore("app", {
   state: () => ({
-    version: "5.0.0",
+    version: "5.1.0",
     credentials: { ...initialCredentials } as AppCredentials,
     user: null as User | null,
   }),

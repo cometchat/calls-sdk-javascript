@@ -22,7 +22,7 @@ This is a reference application showcasing the integration of [CometChat's JavaS
 
 Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app credentials: _`App ID`_, _`Region`_, and _`Auth Key`_
 
-- **Node.js** 18 or higher
+- **Node.js** 20.19 or later
 
 
 ## Installation
@@ -34,19 +34,19 @@ Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app
 
 1. Change into the sample app's directory:
    ```sh
-   cd sample-apps/cometchat-calls-sample-app-vue
+   cd calls-sdk-javascript/sample-apps/cometchat-calls-sample-app-vue
    ```
 
 1. Run `npm install` to install the dependencies.
 
-1. `[Optional]` Configure CometChat credentials:
-    - Open the `appStore.ts` file located at `src/stores/appStore.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
+1. Add your CometChat credentials, in the code or in the app:
+    - Open `src/stores/appStore.ts` and enter your CometChat _`appId`_, _`region`_, and _`authKey`_:
       ```ts
       appId: 'YOUR_APP_ID',
       authKey: 'YOUR_AUTH_KEY',
-      region: 'YOUR_REGION',
+      region: 'US', // 'US', 'EU' or 'IN'
       ```
-    - Alternatively, you can enter your credentials on first launch via the in-app credentials screen.
+    - Or run the app and choose **Change App Credentials** on the sign-in screen. The app can't sign in until the credentials are set.
 
 1. Run the app:
    ```sh

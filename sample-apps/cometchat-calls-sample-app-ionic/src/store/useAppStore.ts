@@ -35,7 +35,7 @@ const initialCredentials: AppCredentials = {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      version: '5.0.0',
+      version: '5.1.0',
       credentials: initialCredentials,
       setCredentials: (credentials) => set({ credentials }),
       clearCredentials: () => set({ credentials: initialCredentials }),

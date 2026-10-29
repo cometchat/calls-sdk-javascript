@@ -104,6 +104,7 @@ cometchat-calls-sample-app-ringing-react/
 │   │   ├── call-tabs.ts         # Several open tabs agree on who answered
 │   │   ├── ringtone.ts          # Ringtone and ringback, made with Web Audio
 │   │   ├── CallOverlay.tsx      # "Calling… / Ringing…" and the incoming call
+│   │   ├── CallOverlay.css      # Styles for the call overlay
 │   │   └── CallScreen.tsx       # The call itself
 │   ├── history/
 │   │   └── call-log-display.ts  # How a call log reads

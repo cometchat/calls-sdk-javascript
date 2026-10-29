@@ -43,7 +43,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       // App version
-      version: '5.0.0',
+      version: '5.1.0',
 
       // Credentials
       credentials: initialCredentials,
