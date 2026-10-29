@@ -56,6 +56,12 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Nothing to sign in to until the app's credentials are set.
+    const { appId, region, authKey } = this.store.credentials();
+    if (!appId || !region || !authKey) {
+      this.router.navigate(['/credentials'], { replaceUrl: true });
+      return;
+    }
     if (this.user) {
       this.router.navigate(['/join-session']);
     }

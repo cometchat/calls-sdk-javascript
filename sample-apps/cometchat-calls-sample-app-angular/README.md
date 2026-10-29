@@ -46,7 +46,7 @@ Sign up for a [CometChat](https://app.cometchat.com/) account to obtain your app
       authKey: 'YOUR_AUTH_KEY',
       region: 'US', // 'US', 'EU' or 'IN'
       ```
-    - Or run the app and choose **Change App Credentials** on the sign-in screen. The app can't sign in until the credentials are set.
+    - Or enter them in the app: until credentials are saved it opens on the **App Credentials** screen. To change them later, choose **Change App Credentials** on the sign-in screen.
 
 1. Run the app:
    ```sh

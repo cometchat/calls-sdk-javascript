@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { push } from 'svelte-spa-router';
+  import { push, replace } from 'svelte-spa-router';
   import { CometChatCalls } from '@cometchat/calls-sdk-javascript';
   import { appStore } from '../../store/appStore.svelte';
   import cometchatLogo from '../../assets/cometchat-logo.svg';
@@ -42,6 +42,14 @@
   let uidInput = $state('cometchat-uid-1');
 
   const rows = [sampleUsers.slice(0, 3), sampleUsers.slice(3, 5)];
+
+  // Nothing to sign in to until the app's credentials are set.
+  $effect(() => {
+    const { appId, region, authKey } = appStore.credentials;
+    if (!appId || !region || !authKey) {
+      replace('/credentials');
+    }
+  });
 
   $effect(() => {
     if (appStore.user) {
